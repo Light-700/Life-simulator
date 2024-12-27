@@ -86,29 +86,38 @@ Widget page =
     
     Future.microtask(() => _switchPage(index));
 
-    return Scaffold(
-      appBar: AppBar(backgroundColor: Color.fromARGB(255, 37, 29, 29),
-        title:const Center(
-          child: Text.rich(
-            TextSpan(
-              children: <TextSpan>[
-                TextSpan(text: ' Be Wise, ', style: TextStyle(fontStyle:  FontStyle.italic, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 238, 33, 18))),
-                TextSpan(text: 'and Game On!', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 18, 187, 238), )),
-              ],
+    return PopScope(
+      canPop: index==0,
+      onPopInvokedWithResult: (didPop, result) {
+  if (!didPop) {
+    navigator(0); 
+    print("back button called");
+  }
+},
+      child: Scaffold(
+        appBar: AppBar(backgroundColor: Color.fromARGB(255, 37, 29, 29),
+          title:const Center(
+            child: Text.rich(
+              TextSpan(
+                children: <TextSpan>[
+                  TextSpan(text: ' Be Wise, ', style: TextStyle(fontStyle:  FontStyle.italic, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 238, 33, 18))),
+                  TextSpan(text: 'and Game On!', style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 18, 187, 238), )),
+                ],
+              ),
             ),
           ),
-        ),
+                ),
+        body:AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+          width: MediaQuery.of(context).size.width + 1,
+              height:MediaQuery.of(context).size.height+ 140/2 + 50, 
+                 constraints: BoxConstraints(
+         minHeight: _pageHeight,
+                    ),
+          child: page, 
               ),
-      body:AnimatedContainer(
-                duration: Duration(milliseconds: 300),
-        width: MediaQuery.of(context).size.width + 1,
-            height:MediaQuery.of(context).size.height+ 140/2 + 50, 
-               constraints: BoxConstraints(
-       minHeight: _pageHeight,
-                  ),
-        child: page, 
-            ),
-      );
+        ),
+    );
 
   }
 }
