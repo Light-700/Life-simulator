@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 // ignore: unused_import
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart'; 
 
 void main() {
   runApp(const MyApp());
@@ -24,6 +25,15 @@ class MyApp extends StatelessWidget {
       home: MyHomePage(),
     );
   }
+}
+
+class ProfileNotifier extends ChangeNotifier{
+ String _uname= "Fragment of Light";
+ String get username => _uname;
+  void updateName(String newuname){
+    _uname=newuname;
+    notifyListeners();
+  }  
 }
 
 class MyHomePage extends StatefulWidget {
@@ -71,7 +81,7 @@ void navigator(int val){
   }
 
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
 Widget page =
    IndexedStack(
   index: index,
@@ -107,15 +117,18 @@ Widget page =
             ),
           ),
                 ),
-        body:AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
-          width: MediaQuery.of(context).size.width + 1,
-              height:MediaQuery.of(context).size.height+ 140/2 + 50, 
-                 constraints: BoxConstraints(
-         minHeight: _pageHeight,
-                    ),
-          child: page, 
-              ),
+        body:ChangeNotifierProvider(
+          create: (context) => ProfileNotifier(),
+          child: AnimatedContainer(
+                    duration: Duration(milliseconds: 300),
+            width: MediaQuery.of(context).size.width + 1,
+                height:MediaQuery.of(context).size.height+ 140/2 + 50, 
+                   constraints: BoxConstraints(
+           minHeight: _pageHeight,
+                      ),
+            child: page, 
+                ),
+        ),
         ),
     );
 
@@ -253,8 +266,9 @@ class AchievementsPage extends StatelessWidget{
 
 }
 
-class ProfilePage extends StatelessWidget{
- final void Function(int) navigator;
+class ProfilePage extends StatelessWidget {
+  final void Function(int) navigator;
+  
   const ProfilePage({
     super.key,
     required this.navigator,
@@ -262,26 +276,108 @@ class ProfilePage extends StatelessWidget{
 
   @override
   Widget build(BuildContext context) {
-   
-    return Column(
-      children: [ OutlinedButton(
-            onPressed: () => navigator(0),
-            style: OutlinedButton.styleFrom(foregroundColor: Color.fromARGB(255, 238, 33, 18),side: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),),
-            // Placing the label inside the button
-            child: Text('Home',
-              style: TextStyle(fontWeight: FontWeight.bold),
+    final profileNotifier = Provider.of<ProfileNotifier>(context);
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Home Button
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: OutlinedButton(
+              onPressed: () => navigator(0),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color.fromARGB(255, 238, 33, 18),
+                side: const BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+              child: const Text(
+                'Home',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
-          Center(
-            child: Text("Profile",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 238, 33, 18),), )
+          
+          // Profile Content
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: double.infinity,
+                  child: Column(
+                    children: [
+                      // Username section
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        width: 180,
+                        child: Text(
+                          "${profileNotifier.username}",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color.fromARGB(255, 18, 187, 238),
+                            fontSize: 20,
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      // Spacing
+                     
+
+                      // Progress bar section
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        width: 180,
+                        child: LinearProgressIndicator(
+                          value: 0.7,
+                          minHeight: 15,
+                          borderRadius: BorderRadius.circular(10),
+                          color: const Color.fromARGB(255, 238, 33, 18),
+                          backgroundColor: const Color.fromARGB(131, 54, 14, 14),
+                        ),
+                      ),
+
+                      // Level text
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        child: const Text(
+                          "Level 1",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color.fromARGB(255, 238, 33, 18),
+                            fontSize: 20,
+                          ),
+                        ),
+                      ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            height:180,
+                            width: 350,
+                            child: Card(surfaceTintColor: Color.fromARGB(255, 232, 38, 13),)),
+                            SizedBox(
+                              height: 180,
+                              width: 250,
+                              child:Card(surfaceTintColor: Color.fromARGB(255, 232, 38, 13),)
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-         
-      ],
+          ),
+        ],
+      ),
     );
   }
-
 }
+
+
 class TaskPage extends StatelessWidget{
  final void Function(int) navigator;
   const TaskPage({
