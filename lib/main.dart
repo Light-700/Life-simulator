@@ -3,13 +3,43 @@ import 'dart:math';
 // ignore: unused_import
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart'; 
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async { WidgetsFlutterBinding.ensureInitialized();
+  
+  // Check if user is logged in
+  final prefs = await SharedPreferences.getInstance();
+  final bool isLoggedIn = await determineLoginStatus();
+  final username = prefs.getString('username') ?? '';
+  
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) {
+        final notifier = ProfileNotifier();
+        if (isLoggedIn && username.isNotEmpty) {
+          notifier.updateName(username);
+        }
+        return notifier;
+      },
+      child: MyApp(isLoggedIn: isLoggedIn),
+    ),
+  );
+}
+
+
+Future<bool> determineLoginStatus() async {
+  final prefs = await SharedPreferences.getInstance();
+  final storedStatus = prefs.getBool('isLoggedIn');
+  if (storedStatus == null) {
+    return false;
+  }
+  return storedStatus;
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
+  
 
   // This widget is the root of your application.
   @override
@@ -22,7 +52,134 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 255, 255)),
         useMaterial3: true,
       ),
-      home: MyHomePage(),
+      home: isLoggedIn ? MyHomePage() : LoginScreen(),
+    );
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  bool _passwordVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      
+      appBar: AppBar(
+        title: const Text('Login'),
+        backgroundColor: const Color.fromARGB(255, 37, 29, 29),
+        centerTitle: true,
+      ),
+      backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(labelText: 'Username',labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: Icon(Icons.person, color: Color.fromARGB(255, 238, 33, 18)),
+              border: OutlineInputBorder(),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18),),),),
+                style: const TextStyle(color: Colors.white),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your username';
+                  }
+                  if (value.length < 5) {
+                    return 'Username must be at least 5 characters long';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: !_passwordVisible,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                    labelStyle: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255, 238, 33, 18)),
+              border: const OutlineInputBorder(),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _passwordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: const Color.fromARGB(255, 238, 33, 18),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _passwordVisible = !_passwordVisible;
+                  });
+                },
+              ),
+            ),
+            style: const TextStyle(color: Colors.white),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your password';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email',labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: Icon(Icons.email, color: Color.fromARGB(255, 238, 33, 18)),
+              border: OutlineInputBorder(),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+            ),
+            style: const TextStyle(color: Colors.white),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                   return 'Please enter a valid email';
+                 }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async{
+                  if (_formKey.currentState!.validate()) {
+                    // Get the ProfileNotifier instance and update username
+                    final profileNotifier = Provider.of<ProfileNotifier>(context, listen: false);
+                    profileNotifier.updateName(_usernameController.text);
+
+                    final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('username', _usernameController.text);
+                    await prefs.setString('email', _emailController.text);
+                    await prefs.setString('password', _passwordController.text);
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder:(context)=> MyHomePage()));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 238, 33, 18),
+                foregroundColor: Colors.white,
+              ),
+                child: const Text('Sign in'),
+              ),
+            ],
+          ),),
+      ),
     );
   }
 }
@@ -559,7 +716,7 @@ class StatsPage extends StatelessWidget {
                               style: TextStyle(color:const Color.fromARGB(255, 18, 187, 238)),
                               );
                               },
-                            ),
+                            ),  
                           ),
                           bottomTitles:AxisTitles(
                             sideTitles: SideTitles(
