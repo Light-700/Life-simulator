@@ -29,11 +29,7 @@ Future<void> main() async { WidgetsFlutterBinding.ensureInitialized();
 
 Future<bool> determineLoginStatus() async {
   final prefs = await SharedPreferences.getInstance();
-  final storedStatus = prefs.getBool('isLoggedIn');
-  if (storedStatus == null) {
-    return false;
-  }
-  return storedStatus;
+  return prefs.getBool('isLoggedIn') ?? false;
 }
 
 class MyApp extends StatelessWidget {
@@ -76,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       appBar: AppBar(
         title: const Text('Login'),
-        backgroundColor: const Color.fromARGB(255, 37, 29, 29),
+        backgroundColor: const Color.fromARGB(255, 228, 190, 21),
         centerTitle: true,
       ),
       backgroundColor: const Color.fromARGB(255, 0, 0, 0),
@@ -131,6 +127,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your password';
                   }
+                  if (value.length < 8) {
+                    return 'Password must be at least 5 characters long';
+                  }
                   return null;
                 },
               ),
@@ -168,7 +167,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('username', _usernameController.text);
                     await prefs.setString('email', _emailController.text);
                     await prefs.setString('password', _passwordController.text);
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder:(context)=> MyHomePage()));
+                   if (context.mounted) {
+        Navigator.pushReplacement(
+          context, 
+          MaterialPageRoute(builder: (context) => MyHomePage())
+        );
+      } 
                   }
                 },
                 style: ElevatedButton.styleFrom(
