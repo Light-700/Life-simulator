@@ -188,13 +188,38 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class ProfileNotifier extends ChangeNotifier{
- String _uname= "Fragment of Light";
- String get username => _uname;
-  void updateName(String newuname){
-    _uname=newuname;
+class ProfileNotifier extends ChangeNotifier {
+  static const String USERNAME_KEY = 'username';
+  String uname = "Fragment of Light"; // Default value
+  
+  ProfileNotifier() {
+    // Load saved username when the notifier is created
+    _loadUsername();
+  }
+  
+  String get username => uname;
+  
+  // Load username from SharedPreferences
+  Future<void> _loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUsername = prefs.getString(USERNAME_KEY);
+    
+    if (savedUsername != null) {
+      uname = savedUsername;
+      notifyListeners();
+    }
+  }
+  
+  // Update username and save to SharedPreferences
+  Future<void> updateName(String newuname) async {
+    uname = newuname;
+    
+    // Save to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(USERNAME_KEY, newuname);
+    
     notifyListeners();
-  }  
+  }
 }
 
 class MyHomePage extends StatefulWidget {
