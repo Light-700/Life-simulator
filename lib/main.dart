@@ -189,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class ProfileNotifier extends ChangeNotifier {
-  static const String USERNAME_KEY = 'username';
+  static const String usernameKey = 'username';
   String uname = "Fragment of Light"; // Default value
   
   ProfileNotifier() {
@@ -202,7 +202,7 @@ class ProfileNotifier extends ChangeNotifier {
   // Load username from SharedPreferences
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedUsername = prefs.getString(USERNAME_KEY);
+    final savedUsername = prefs.getString(usernameKey); 
     
     if (savedUsername != null) {
       uname = savedUsername;
@@ -210,13 +210,12 @@ class ProfileNotifier extends ChangeNotifier {
     }
   }
   
-  // Update username and save to SharedPreferences
   Future<void> updateName(String newuname) async {
     uname = newuname;
     
     // Save to SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(USERNAME_KEY, newuname);
+    await prefs.setString(usernameKey, newuname);
     
     notifyListeners();
   }
@@ -303,18 +302,15 @@ Widget page =
             ),
           ),
                 ),
-        body:ChangeNotifierProvider(
-          create: (context) => ProfileNotifier(),
-          child: AnimatedContainer(
-                    duration: Duration(milliseconds: 300),
-            width: MediaQuery.of(context).size.width + 1,
-                height:MediaQuery.of(context).size.height+ 140/2 + 50, 
-                   constraints: BoxConstraints(
-           minHeight: _pageHeight,
-                      ),
-            child: page, 
-                ),
-        ),
+        body:AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+          width: MediaQuery.of(context).size.width + 1,
+              height:MediaQuery.of(context).size.height+ 140/2 + 50, 
+                 constraints: BoxConstraints(
+         minHeight: _pageHeight,
+                    ),
+          child: page, 
+              ),
         ),
     );
 
