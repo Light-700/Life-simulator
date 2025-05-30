@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 // ignore: unused_import
-import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'src/screens/achievements.dart';
+import 'src/screens/profile.dart';
+import 'src/screens/stats.dart';
+import 'src/screens/tasks.dart';
 
 Future<void> main() async { WidgetsFlutterBinding.ensureInitialized();
   
@@ -13,7 +17,7 @@ Future<void> main() async { WidgetsFlutterBinding.ensureInitialized();
   final username = prefs.getString('username') ?? '';
   
   runApp(
-    ChangeNotifierProvider(
+    ChangeNotifierProvider(//makes the ProfileNotifier available to the entire app
       create: (context) {
         final notifier = ProfileNotifier();
         if (isLoggedIn && username.isNotEmpty) {
@@ -48,7 +52,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 255, 255)),
         useMaterial3: true,
       ),
-      home: isLoggedIn ? MyHomePage() : LoginScreen(),
+      home: isLoggedIn ? MyHomePage() : LoginScreen(),// is the user logged in?
     );
   }
 }
@@ -193,7 +197,7 @@ class ProfileNotifier extends ChangeNotifier {
   String uname = "Fragment of Light"; // Default value
   
   ProfileNotifier() {
-    // Load saved username when the notifier is created
+    // constructor execution function to load the username
     _loadUsername();
   }
   
@@ -255,6 +259,7 @@ void navigator(int val){
       });
     }
   }
+
 
 
   @override
@@ -411,433 +416,3 @@ class HexagonLayout extends StatelessWidget {
 }
 
 
-class AchievementsPage extends StatelessWidget{
- final void Function(int) navigator;
-  const AchievementsPage({
-    super.key,
-    required this.navigator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    
-    return Column(
-      children: [ OutlinedButton(
-            onPressed: () => navigator(0),
-            style: OutlinedButton.styleFrom(foregroundColor: Color.fromARGB(255, 238, 33, 18),side: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),),
-            child: Text('Home',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          )
-          ,
-          Center(
-            child: Text("Achievements",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 238, 33, 18),), )
-            ),
-      ],
-    );
-  }
-
-}
-
-class ProfilePage extends StatelessWidget {
-  final void Function(int) navigator;
-  
-  const ProfilePage({
-    super.key,
-    required this.navigator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-      final profileNotifier = Provider.of<ProfileNotifier>(context);
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                OutlinedButton(
-                  onPressed: () => navigator(0),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color.fromARGB(255, 238, 179, 18),
-                    side: const BorderSide(color: Color.fromARGB(255, 238, 179, 18)),
-                  ),
-                  child: const Text(
-                    'Home',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Profile",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromARGB(255, 238, 179, 18),
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width:150,
-                      height: 180,
-                      child: Card(
-                        shape: OutlinedBorder.lerp(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: const BorderSide(
-                              color: Color.fromARGB(255, 238, 179, 18),
-                              width: 2,
-                            ),
-                          ),
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          0,
-                        ),
-                        color: const Color.fromARGB(255, 37, 29, 29),
-                        child: const SizedBox(
-                          height: 120,
-                          child: Icon(
-                            Icons.rocket_launch,
-                            size: 60,
-                            color: Color.fromARGB(255, 160, 196, 17),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                 
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            profileNotifier.username,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color.fromARGB(255, 255, 255, 255),
-                              fontSize: 24,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: 0.7,
-                            minHeight: 15,
-                            borderRadius: BorderRadius.circular(10),
-                            color: const Color.fromARGB(255, 238, 179, 18),
-                            backgroundColor: const Color.fromARGB(131, 109, 29, 29),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-                Card(
-                  shape: OutlinedBorder.lerp(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: const BorderSide(
-                        color: Color.fromARGB(255, 238, 179, 18),
-                        width: 2,
-                      ),
-                    ),
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    0,
-                  ),
-                  color: const Color.fromARGB(255, 37, 29, 29),
-                  child: const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Text(
-                          "Level 1",
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 18, 187, 238),
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          "Novice",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Stats Card
-                const SizedBox(height: 16),
-                Card(
-                  shape: OutlinedBorder.lerp(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: const BorderSide(
-                        color: Color.fromARGB(255, 238, 179, 18),
-                        width: 2,
-                      ),
-                    ),
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    0,
-                  ),
-                  color: const Color.fromARGB(255, 37, 29, 29),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Stats",
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 18, 187, 238),
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildStat("Tasks", "0"),
-                            _buildStat("Points", "0"),
-                            _buildStat("Streak", "0"),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],  
-      ),
-    );
-  }
-
-  Widget _buildStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color.fromARGB(255, 255, 254, 254),
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Color.fromARGB(255, 238, 179, 18),
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-
-class TaskPage extends StatelessWidget{
- final void Function(int) navigator;
-  const TaskPage({
-    super.key,
-    required this.navigator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    
-    return Column(
-      children: [ OutlinedButton(
-            onPressed: () => navigator(0),
-            style: OutlinedButton.styleFrom(foregroundColor: Color.fromARGB(255, 238, 33, 18),side: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),),
-            // Placing the label inside the button
-            child: Text('Home',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Center(
-            child: Text("Tasks",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 238, 33, 18),), )
-            ),
-      ],
-    );
-  }
-
-}
-class StatsPage extends StatelessWidget {
-  final void Function(int) navigator;
-
-  const StatsPage({
-    super.key,
-    required this.navigator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          OutlinedButton(
-            onPressed: () => navigator(0),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color.fromARGB(255, 238, 33, 18),
-              side: const BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
-            ),
-            child: const Text(
-              'Home',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Center(
-            child: AspectRatio(
-              aspectRatio: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: LineChart(
-                      LineChartData(
-                        titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              reservedSize: 40,
-                              interval: 5,
-                              showTitles: true,
-                              getTitlesWidget: (value, meta){
-                              return Text(
-                                value.toString(),
-                              style: TextStyle(color:const Color.fromARGB(255, 18, 187, 238)),
-                              );
-                              },
-                            ),  
-                          ),
-                          bottomTitles:AxisTitles(
-                            sideTitles: SideTitles(
-                              reservedSize: 30,
-                              interval: 2,
-                              showTitles: true,
-                              getTitlesWidget: (value, meta){
-                              return Text(
-                                value.toString(),
-                              style: TextStyle(color:const Color.fromARGB(255, 18, 187, 238)),
-                              );
-                              },
-                            ),
-                          ), 
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: false,
-                            ),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: false,
-                            ),
-                          ),
-                        ),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: const [
-                              FlSpot(2, 3),
-                              FlSpot(5, 6),
-                              FlSpot(8, 3),
-                              FlSpot(2, 11),
-                              FlSpot(6, 10),
-                            ],
-                            gradient: LinearGradient(
-                              colors: [ Color.fromARGB(255, 179, 24, 49), Colors.lightBlue, Color.fromARGB(255, 18, 160, 77)],
-                            ) ,
-                            curveSmoothness: 0.2,
-                            preventCurveOverShooting: true,
-                            dotData: FlDotData(
-                              show:true,
-                              checkToShowDot: (spot, barData) {
-                                return true;
-                              },
-                            ),
-                          ),
-                        ]
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-                        const SizedBox(height: 15),
-          Center(
-            child: AspectRatio(
-              aspectRatio: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                child: RadarChart(
-                      RadarChartData( 
-                        gridBorderData:BorderSide(color: Colors.blueGrey),
-                        radarShape: RadarShape.polygon,
-                        radarBorderData: BorderSide(color: Colors.blueGrey),
-                       getTitle: (index,angle) {
-                        
-      switch(index){
-        case 0:
-        return RadarChartTitle(text: "Speed" );
-        case 1:
-        return RadarChartTitle(text: "Agility");
-        case 2:
-        return RadarChartTitle(text: "Power");
-        case 3:
-        return RadarChartTitle(text: "Strength");
-        case 4:
-        return RadarChartTitle(text: "Tactics");
-        default:
-        return RadarChartTitle(text: " ");
-       
-      }
-                       },
-                      dataSets: [
-              RadarDataSet(
-                dataEntries: [
-                  RadarEntry(value: 5),
-                  RadarEntry(value: 3),
-                  RadarEntry(value: 4),
-                  RadarEntry(value: 6),
-                  RadarEntry(value: 2),
-                ],
-                 borderColor: Colors.amber,
-                fillColor: const Color.fromARGB(128, 76, 133, 180),
-                borderWidth: 2,
-                ),
-                      ],
-                      tickCount: 5,
-                      ),
-                    ),
-                ),
-                ),
-              ),
-         ],
-         ), 
-      );
-  }
-
-}
