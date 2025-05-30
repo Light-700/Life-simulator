@@ -256,14 +256,6 @@ void navigator(int val){
     }
   }
 
-  void _switchPage(int index) {
-    setState(() {
-     
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateHeight();
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +271,7 @@ Widget page =
   ],
 );
     
-    Future.microtask(() => _switchPage(index));
+   // Future.microtask(() => _switchPage(index));
 
     return PopScope(
       canPop: index==0,
