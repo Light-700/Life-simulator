@@ -12,7 +12,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-      final profileNotifier = Provider.of<ProfileNotifier>(context);
+    final profileNotifier = Provider.of<ProfileNotifier>(context);
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -20,16 +20,93 @@ class ProfilePage extends StatelessWidget {
             padding: const EdgeInsets.all(8.0),
             child: Column(
               children: [
-                OutlinedButton(
-                  onPressed: () => navigator(0),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color.fromARGB(255, 238, 179, 18),
-                    side: const BorderSide(color: Color.fromARGB(255, 238, 179, 18)),
-                  ),
-                  child: const Text(
-                    'Home',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                Row(
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => navigator(0),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color.fromARGB(255, 238, 179, 18),
+                        side: const BorderSide(color: Color.fromARGB(255, 238, 179, 18)),
+                      ),
+                      child: const Text(
+                        'Home',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 25),
+                    OutlinedButton(
+                      onPressed: () async {
+                        // Show confirmation dialog
+                        bool? shouldLogout = await showDialog<bool>(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              backgroundColor: const Color.fromARGB(255, 37, 29, 29),
+                              title: const Text(
+                                'Logout Confirmation',
+                                style: TextStyle(
+                                  color: Color.fromARGB(255, 238, 33, 18),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: const Text(
+                                'Are you sure you want to logout?',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(color: Color.fromARGB(255, 18, 187, 238)),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  child: const Text(
+                                    'Logout',
+                                    style: TextStyle(color: Color.fromARGB(255, 238, 33, 18)),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+
+                        if (shouldLogout == true && context.mounted) {
+                          // Store navigator before async operation
+                          final navigator = Navigator.of(context);
+                          
+                          // Perform logout
+                          await profileNotifier.logout();
+                          
+                          // Use stored navigator instead of context
+                          navigator.pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color.fromARGB(255, 238, 179, 18),
+                        side: const BorderSide(color: Color.fromARGB(255, 238, 179, 18)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -52,7 +129,7 @@ class ProfilePage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
-                      width:150,
+                      width: 150,
                       height: 180,
                       child: Card(
                         shape: OutlinedBorder.lerp(
@@ -107,7 +184,8 @@ class ProfilePage extends StatelessWidget {
                     ),
                   ],
                 ),
-
+                
+                // Level Card
                 const SizedBox(height: 16),
                 Card(
                   shape: OutlinedBorder.lerp(

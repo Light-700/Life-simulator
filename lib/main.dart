@@ -9,7 +9,8 @@ import 'src/screens/profile.dart';
 import 'src/screens/stats.dart';
 import 'src/screens/tasks.dart';
 
-Future<void> main() async { WidgetsFlutterBinding.ensureInitialized();
+Future<void> main() async { 
+  WidgetsFlutterBinding.ensureInitialized();
   
   // Check if user is logged in
   final prefs = await SharedPreferences.getInstance();
@@ -223,6 +224,17 @@ class ProfileNotifier extends ChangeNotifier {
     
     notifyListeners();
   }
+
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    await prefs.remove('username');
+    await prefs.remove('email');
+    await prefs.remove('password');
+    uname = "Fragment of Light";
+    notifyListeners();
+    }
+
 }
 
 class MyHomePage extends StatefulWidget {
