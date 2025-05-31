@@ -8,17 +8,19 @@ import 'src/screens/achievements.dart';
 import 'src/screens/profile.dart';
 import 'src/screens/stats.dart';
 import 'src/screens/tasks.dart';
+import 'src/screens/extended_login.dart';
 
 Future<void> main() async { 
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Check if user is logged in
+  // Check if user is logged in and profile is completed
   final prefs = await SharedPreferences.getInstance();
   final bool isLoggedIn = await determineLoginStatus();
+  final bool profileCompleted = prefs.getBool('profileCompleted') ?? false;
   final username = prefs.getString('username') ?? '';
   
   runApp(
-    ChangeNotifierProvider(//makes the ProfileNotifier available to the entire app
+    ChangeNotifierProvider(
       create: (context) {
         final notifier = ProfileNotifier();
         if (isLoggedIn && username.isNotEmpty) {
@@ -26,10 +28,14 @@ Future<void> main() async {
         }
         return notifier;
       },
-      child: MyApp(isLoggedIn: isLoggedIn),
+      child: MyApp(
+        isLoggedIn: isLoggedIn, 
+        profileCompleted: profileCompleted
+      ),
     ),
   );
 }
+
 
 
 Future<bool> determineLoginStatus() async {
@@ -39,24 +45,39 @@ Future<bool> determineLoginStatus() async {
 
 class MyApp extends StatelessWidget {
   final bool isLoggedIn;
-  const MyApp({super.key, required this.isLoggedIn});
+  final bool profileCompleted;
   
+  const MyApp({
+    super.key, 
+    required this.isLoggedIn,
+    this.profileCompleted = false,
+  });
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    Widget home;
+    
+    if (!isLoggedIn) {
+      home = LoginScreen();
+    } else if (!profileCompleted) {
+      home = ExtendedDetailsPage();
+    } else {
+      home = MyHomePage();
+    }
+    
     return MaterialApp(
       title: 'Life Simulator',
       theme: ThemeData(
         scaffoldBackgroundColor: Color.fromARGB(255, 0, 0, 0),
-        fontFamily: 'ArsenalSC' ,
+        fontFamily: 'ArsenalSC',
         colorScheme: ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 255, 255)),
         useMaterial3: true,
       ),
-      home: isLoggedIn ? MyHomePage() : LoginScreen(),// is the user logged in?
+      home: home,
     );
   }
 }
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -175,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                    if (context.mounted) {
         Navigator.pushReplacement(
           context, 
-          MaterialPageRoute(builder: (context) => MyHomePage())
+          MaterialPageRoute(builder: (context) => ExtendedDetailsPage())
         );
       } 
                   }
@@ -221,19 +242,36 @@ class ProfileNotifier extends ChangeNotifier {
     // Save to SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(usernameKey, newuname);
-    
+     
     notifyListeners();
   }
 
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isLoggedIn', false);
-    await prefs.remove('username');
-    await prefs.remove('email');
-    await prefs.remove('password');
-    uname = "Fragment of Light";
-    notifyListeners();
-    }
+ Future<void> logout() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('isLoggedIn', false);
+  await prefs.setBool('profileCompleted', false);
+  await prefs.remove('username');
+  await prefs.remove('email');
+  await prefs.remove('password');
+  await prefs.remove('age');
+  await prefs.remove('weight');
+  await prefs.remove('height');
+  await prefs.remove('runningSpeed');
+  await prefs.remove('lungCapacity');
+  await prefs.remove('restingHeartRate');
+  await prefs.remove('bodyFat');
+  await prefs.remove('hunterClass');
+  await prefs.remove('fitnessGoal');
+  await prefs.remove('strengthStat');
+  await prefs.remove('agilityStat');
+  await prefs.remove('enduranceStat');
+  await prefs.remove('vitalityStat');
+  await prefs.remove('intelligenceStat');
+  
+  uname = "Fragment of Light";
+  notifyListeners();
+}
+
 
 }
 
