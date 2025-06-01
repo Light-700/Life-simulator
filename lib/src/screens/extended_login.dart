@@ -18,27 +18,32 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
   final TextEditingController _lungCapacityController = TextEditingController();
   final TextEditingController _restingHeartRateController = TextEditingController();
   final TextEditingController _bodyFatController = TextEditingController();
+  final TextEditingController _weightliftcapacity = TextEditingController();
+  final TextEditingController _iqController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   
-  String _selectedClass = 'E-Rank Hunter';
-  String _selectedGoal = 'Strength Enhancement';
+  String _selectedJob = 'Student';
+  String _selectedGoal = 'Brain Activity Enhancement';
   
-  final List<String> _hunterClasses = [
-    'E-Rank Hunter',
-    'D-Rank Hunter',
-    'C-Rank Hunter',
-    'B-Rank Hunter',
-    'A-Rank Hunter',
-    'S-Rank Hunter'
+  final List<String> _Jobs = [
+    'Warrior',
+    'Student',
+    'Primary Sector',
+    'Tertiary Sector',
+    'Secondary Sector',
+    'Administrator/Politician',
+    'Homemaker',
+    'Denizen of DarkWorld'
   ];
   
+
   final List<String> _fitnessGoals = [
     'Strength Enhancement',
     'Agility Training',
     'Endurance Building',
     'Combat Readiness',
-    'Mana Recovery',
-    'Overall Hunter Development'
+    'Brain Activity Enhancement',
+    'Overall Development'
   ];
 
   Map<String, int> _calculateGameStats() {
@@ -48,15 +53,17 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     double lungCapacity = double.tryParse(_lungCapacityController.text) ?? 0;
     double heartRate = double.tryParse(_restingHeartRateController.text) ?? 0;
     double bodyFat = double.tryParse(_bodyFatController.text) ?? 0;
+    double weightliftcapacity = double.tryParse(_weightliftcapacity.text) ?? 0;
+    int iq = int.tryParse(_iqController.text) ?? 0;
     int age = int.tryParse(_ageController.text) ?? 0;
     
     double bmi = height > 0 ? weight / ((height / 100) * (height / 100)) : 0;
     
-    int strength = _calculateStrength(weight, height, bodyFat, bmi);
+    int strength = _calculateStrength(weight, height, bodyFat, bmi, weightliftcapacity);
     int agility = _calculateAgility(speed, bodyFat, bmi);
     int endurance = _calculateEndurance(lungCapacity, heartRate, age, bodyFat);
     int vitality = _calculateVitality(bmi, bodyFat, heartRate, age);
-    int intelligence = _calculateIntelligence(_selectedClass, age);
+    int intelligence = _calculateIntelligence(iq, age);
     
     return {
       'strength': strength,
@@ -67,8 +74,8 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     };
   }
 
-  int _calculateStrength(double weight, double height, double bodyFat, double bmi) {
-    double leanBodyMass = weight * (1 - bodyFat / 100);
+ int _calculateStrength(double weight, double height, double bodyFat, double bmi, double weightliftcapacity) {
+    double leanBodyMass = weight * (1 - (bodyFat / 100));
     double heightInM = height / 100;
     double ffmi = heightInM > 0 ? leanBodyMass / (heightInM * heightInM) : 0;
     
@@ -86,8 +93,20 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     }
     
     int heightBonus = (bmi >= 22 && bmi <= 27) ? 15 : 0;
-    return (baseStrength + heightBonus).clamp(0, 100);
-  }
+    
+    int physicalComponent = baseStrength + heightBonus;
+    double normalizedPhysical = (physicalComponent / 100.0) * 100;
+    
+   weightliftcapacity = weightliftcapacity.clamp(0, 500); //non-negative and not more than 500
+
+    double normalizedWeightlift = (weightliftcapacity / 500.0) * 100; // Assuming max weightlift is ~500
+    
+    // 50% each component
+    int finalStrength = ((normalizedPhysical * 0.5) + (normalizedWeightlift * 0.5)).toInt();
+    
+    return finalStrength.clamp(0, 200);
+}
+
 
   int _calculateAgility(double speed, double bodyFat, double bmi) {
     int speedScore = 0;
@@ -125,26 +144,28 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
   }
 
   int _calculateEndurance(double lungCapacity, double heartRate, int age, double bodyFat) {
+    // Lung capacity scoring (based on 6L average)
     int lungScore = 0;
-    if (lungCapacity >= 3.5) {
-      lungScore = 35;
-    } else if (lungCapacity >= 3.0) {
-      lungScore = 25;
-    } else if (lungCapacity >= 2.5) {
-      lungScore = 15;
+    if (lungCapacity >= 6) {
+      lungScore = 35;  
+    } else if (lungCapacity >= 5) {
+      lungScore = 25;  
+    } else if (lungCapacity >= 4) {
+      lungScore = 15; 
     } else {
-      lungScore = 5;
+      lungScore = 5;  
     }
     
+    // Heart rate scoring (lower is better)
     int heartScore = 0;
     if (heartRate <= 60) {
-      heartScore = 35;
+      heartScore = 35; 
     } else if (heartRate <= 70) {
-      heartScore = 25;
+      heartScore = 25; 
     } else if (heartRate <= 80) {
       heartScore = 15;
     } else {
-      heartScore = 5;
+      heartScore = 5; 
     }
     
     int ageScore = 0;
@@ -158,9 +179,11 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
       ageScore = 5;
     }
     
+    // Body fat penalty (higher fat reduces endurance)
     int fatPenalty = bodyFat > 20 ? -10 : 0;
     return (lungScore + heartScore + ageScore + fatPenalty).clamp(0, 100);
-  }
+}
+
 
   int _calculateVitality(double bmi, double bodyFat, double heartRate, int age) {
     int bmiScore = 0;
@@ -190,55 +213,42 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
       cardioScore = 5;
     }
     
-    int ageVitality = math.max(0, 100 - age); // Fixed: math instead of Math
+    int ageVitality = math.max(0, 100 - age); 
     int ageScore = (ageVitality * 0.2).round();
     
     return (bmiScore + fatScore + cardioScore + ageScore).clamp(0, 100);
   }
 
-  int _calculateIntelligence(String hunterClass, int age) {
-    int classBonus = 0;
-    switch (hunterClass) {
-      case 'S-Rank Hunter': 
-        classBonus = 30; 
-        break;
-      case 'A-Rank Hunter': 
-        classBonus = 25; 
-        break;
-      case 'B-Rank Hunter': 
-        classBonus = 20; 
-        break;
-      case 'C-Rank Hunter': 
-        classBonus = 15; 
-        break;
-      case 'D-Rank Hunter': 
-        classBonus = 10; 
-        break;
-      case 'E-Rank Hunter': 
-        classBonus = 5; 
-        break;
-      default: 
-        classBonus = 5;
+  int _calculateIntelligence(int iq, int age) {
+   int iqbonus=0;
+    if (iq >= 130) {
+      iqbonus = 30; 
+    } else if (iq >= 110) {
+      iqbonus = 20; 
+    } else if (iq >= 90) {
+      iqbonus = 10; 
+    } else {
+      iqbonus = 5; 
     }
     
     int ageBonus = 0;
-    if (age >= 25 && age <= 40) {
+    if (age <=25) {
       ageBonus = 20;
-    } else if (age >= 18 && age <= 50) {
+    } else if (age <=35) {
       ageBonus = 15;
     } else {
       ageBonus = 10;
     }
     
     int baseIntelligence = 50;
-    return (baseIntelligence + classBonus + ageBonus).clamp(0, 100);
+    return (baseIntelligence + iqbonus + ageBonus).clamp(0, 100);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hunter Physical Assessment'),
+        title: const Text('Awakening Assessment'),
         backgroundColor: const Color.fromARGB(255, 228, 190, 21),
         centerTitle: true,
         automaticallyImplyLeading: false,
@@ -253,7 +263,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
             children: [
               const Center(
                 child: Text(
-                  'Hunter Guild Registration\nPhysical Assessment',
+                  'Hunter Association Registration\n Assessment',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color.fromARGB(255, 238, 33, 18),
@@ -327,11 +337,11 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Required';
                   final speed = double.tryParse(value);
-                  if (speed == null || speed < 0 || speed > 50) return 'Invalid speed';
+                  if (speed == null || speed < 0 || speed > 55) return 'Invalid speed';
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 15),
               
               _buildTextField(
                 controller: _lungCapacityController,
@@ -345,48 +355,74 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _restingHeartRateController,
-                      label: 'Resting Heart Rate (bpm)',
-                      icon: Icons.favorite,
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        final hr = double.tryParse(value);
-                        if (hr == null || hr < 40 || hr > 120) return 'Invalid HR';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _bodyFatController,
-                      label: 'Body Fat %',
-                      icon: Icons.fitness_center,
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        final bf = double.tryParse(value);
-                        if (bf == null || bf < 3 || bf > 50) return 'Invalid %';
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 15),
+
+              Expanded(
+                child: _buildTextField(
+                  controller: _restingHeartRateController,
+                  label: 'Resting Heart Rate (bpm)',
+                  icon: Icons.favorite,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    final hr = double.tryParse(value);
+                    if (hr == null || hr < 40 || hr > 120) return 'Invalid HR';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: _buildTextField(
+                  controller: _bodyFatController,
+                  label: 'Body Fat %',
+                  icon: Icons.fitness_center,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    final bf = double.tryParse(value);
+                    if (bf == null || bf < 3 || bf > 50) return 'Invalid %';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 15),
+              Expanded(
+                child: _buildTextField(
+                  controller: _weightliftcapacity,
+                  label: 'Weight Lift Capacity (kg)',
+                  icon: Icons.fitness_center,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    final wc = double.tryParse(value);
+                    if (wc == null || wc < 0 || wc > 500) return 'Invalid capacity';
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(height: 15),
+              Expanded(
+                child: _buildTextField(
+                  controller: _iqController,
+                  label: 'IQ Level',
+                  icon: Icons.psychology,
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    final iq = int.tryParse(value);
+                    if (iq == null || iq < 50 || iq > 200) return 'Invalid IQ';
+                    return null;
+                  },
+                ),
               ),
               const SizedBox(height: 20),
               
-              _buildSectionHeader('Hunter Preferences'),
+              _buildSectionHeader('Preferences'),
               const SizedBox(height: 10),
               
-              _buildDropdown('Hunter Class', _selectedClass, _hunterClasses, (value) {
-                setState(() => _selectedClass = value!);
+              _buildDropdown('User Job', _selectedJob, _Jobs, (value) {
+                setState(() => _selectedJob = value!);
               }),
               const SizedBox(height: 16),
               
@@ -420,7 +456,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
-                    'Complete Hunter Registration',
+                    'Complete Awakening Registration',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -562,7 +598,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     await prefs.setString('lungCapacity', _lungCapacityController.text);
     await prefs.setString('restingHeartRate', _restingHeartRateController.text);
     await prefs.setString('bodyFat', _bodyFatController.text);
-    await prefs.setString('hunterClass', _selectedClass);
+    await prefs.setString('Job', _selectedJob);
     await prefs.setString('fitnessGoal', _selectedGoal);
     
     await prefs.setInt('strengthStat', stats['strength']!);
