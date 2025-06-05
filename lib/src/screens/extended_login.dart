@@ -36,7 +36,6 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     'Denizen of DarkWorld'
   ];
   
-
   final List<String> _fitnessGoals = [
     'Strength Enhancement',
     'Agility Training',
@@ -74,7 +73,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     };
   }
 
- int _calculateStrength(double weight, double height, double bodyFat, double bmi, double weightliftcapacity) {
+  int _calculateStrength(double weight, double height, double bodyFat, double bmi, double weightliftcapacity) {
     double leanBodyMass = weight * (1 - (bodyFat / 100));
     double heightInM = height / 100;
     double ffmi = heightInM > 0 ? leanBodyMass / (heightInM * heightInM) : 0;
@@ -97,16 +96,15 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     int physicalComponent = baseStrength + heightBonus;
     double normalizedPhysical = (physicalComponent / 100.0) * 100;
     
-   weightliftcapacity = weightliftcapacity.clamp(0, 500); //non-negative and not more than 500
+    weightliftcapacity = weightliftcapacity.clamp(0, 500);
 
-    double normalizedWeightlift = (weightliftcapacity / 500.0) * 100; // Assuming max weightlift is ~500
+    double normalizedWeightlift = (weightliftcapacity / 500.0) * 100;
     
     // 50% each component
     int finalStrength = ((normalizedPhysical * 0.5) + (normalizedWeightlift * 0.5)).toInt();
     
     return finalStrength.clamp(0, 200);
-}
-
+  }
 
   int _calculateAgility(double speed, double bodyFat, double bmi) {
     int speedScore = 0;
@@ -182,8 +180,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     // Body fat penalty (higher fat reduces endurance)
     int fatPenalty = bodyFat > 20 ? -10 : 0;
     return (lungScore + heartScore + ageScore + fatPenalty).clamp(0, 100);
-}
-
+  }
 
   int _calculateVitality(double bmi, double bodyFat, double heartRate, int age) {
     int bmiScore = 0;
@@ -220,7 +217,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
   }
 
   int _calculateIntelligence(int iq, int age) {
-   int iqbonus=0;
+    int iqbonus = 0;
     if (iq >= 130) {
       iqbonus = 30; 
     } else if (iq >= 110) {
@@ -232,9 +229,9 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     }
     
     int ageBonus = 0;
-    if (age <=25) {
+    if (age <= 25) {
       ageBonus = 20;
-    } else if (age <=35) {
+    } else if (age <= 35) {
       ageBonus = 15;
     } else {
       ageBonus = 10;
@@ -356,65 +353,59 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
                 },
               ),
               const SizedBox(height: 15),
-
-              Expanded(
-                child: _buildTextField(
-                  controller: _restingHeartRateController,
-                  label: 'Resting Heart Rate (bpm)',
-                  icon: Icons.favorite,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final hr = double.tryParse(value);
-                    if (hr == null || hr < 40 || hr > 120) return 'Invalid HR';
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildTextField(
-                  controller: _bodyFatController,
-                  label: 'Body Fat %',
-                  icon: Icons.fitness_center,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final bf = double.tryParse(value);
-                    if (bf == null || bf < 3 || bf > 50) return 'Invalid %';
-                    return null;
-                  },
-                ),
+              
+              // FIXED: Properly arranged in Row containers
+              _buildTextField(
+                controller: _restingHeartRateController,
+                label: 'Resting Heart Rate (bpm)',
+                icon: Icons.favorite,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  final hr = double.tryParse(value);
+                  if (hr == null || hr < 40 || hr > 120) return 'Invalid HR';
+                  return null;
+                },
               ),
               const SizedBox(height: 15),
-              Expanded(
-                child: _buildTextField(
-                  controller: _weightliftcapacity,
-                  label: 'Weight Lift Capacity (kg)',
-                  icon: Icons.fitness_center,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final wc = double.tryParse(value);
-                    if (wc == null || wc < 0 || wc > 500) return 'Invalid capacity';
-                    return null;
-                  },
-                ),
+              _buildTextField(
+                controller: _bodyFatController,
+                label: 'Body Fat %',
+                icon: Icons.fitness_center,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  final bf = double.tryParse(value);
+                  if (bf == null || bf < 3 || bf > 50) return 'Invalid %';
+                  return null;
+                },
               ),
               const SizedBox(height: 15),
-              Expanded(
-                child: _buildTextField(
-                  controller: _iqController,
-                  label: 'IQ Level',
-                  icon: Icons.psychology,
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final iq = int.tryParse(value);
-                    if (iq == null || iq < 50 || iq > 200) return 'Invalid IQ';
-                    return null;
-                  },
-                ),
+              
+              _buildTextField(
+                controller: _weightliftcapacity,
+                label: 'Weight Lift Capacity (kg)',
+                icon: Icons.fitness_center,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  final wc = double.tryParse(value);
+                  if (wc == null || wc < 0 || wc > 500) return 'Invalid capacity';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 15),
+              _buildTextField(
+                controller: _iqController,
+                label: 'IQ Level',
+                icon: Icons.psychology,
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  final iq = int.tryParse(value);
+                  if (iq == null || iq < 50 || iq > 200) return 'Invalid IQ';
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
               
