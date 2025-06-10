@@ -217,21 +217,31 @@ class _LoginScreenState extends State<LoginScreen> {
 class ProfileNotifier extends ChangeNotifier {
   static const String usernameKey = 'username';
   String uname = "Fragment of Light"; // Default value
-  
+  int _baseExp=1;
+  int baselevel=1;
   ProfileNotifier() {
-    // constructor execution function to load the username
+    // constructor execution function to load the username and exp/level
     _loadUsername();
   }
   
   String get username => uname;
+  int get xp=> _baseExp;
+  int get level => baselevel;
   
   // Load username from SharedPreferences
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUsername = prefs.getString(usernameKey); 
+    final savedexp = prefs.getInt('exp'); 
+
     
     if (savedUsername != null) {
       uname = savedUsername;
+      notifyListeners();
+    }
+
+    if(savedexp != null){
+      _baseExp= savedexp;
       notifyListeners();
     }
   }
@@ -243,6 +253,19 @@ class ProfileNotifier extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(usernameKey, newuname);
      
+    notifyListeners();
+  }
+
+  Future<void> updateXP(int exp) async {
+    _baseExp = _baseExp + exp;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('exp', _baseExp);
+    notifyListeners();
+  }
+
+  Future<void> updateLevel(int level) async{
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('level', level);
     notifyListeners();
   }
 

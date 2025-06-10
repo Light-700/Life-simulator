@@ -45,6 +45,8 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     'Overall Development'
   ];
 
+String _class ='S-class';
+
   Map<String, int> _calculateGameStats() {
     double weight = double.tryParse(_weightController.text) ?? 0;
     double height = double.tryParse(_heightController.text) ?? 0;
@@ -63,6 +65,28 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     int endurance = _calculateEndurance(lungCapacity, heartRate, age, bodyFat);
     int vitality = _calculateVitality(bmi, bodyFat, heartRate, age);
     int intelligence = _calculateIntelligence(iq, age);
+
+    int totalStats =strength + agility + endurance + vitality + intelligence;
+    int totalPossible = 600;
+
+     if(totalStats>(0.9*totalPossible)){
+      _class='S-Class';
+     }
+     else if(totalStats>(0.75*totalPossible)){
+      _class = 'A-class';
+     }
+     else if(totalStats>(0.65*totalPossible)){
+      _class ='B-class';
+     }
+     else if(totalStats>(0.55*totalPossible)){
+      _class = 'C-class';
+     }
+     else if(totalStats>(0.4*totalPossible)){
+      _class = 'D-class';
+     }
+     else{
+      _class = 'E-class';
+     }
     
     return {
       'strength': strength,
@@ -242,7 +266,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) { 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Awakening Assessment'),
@@ -591,12 +615,16 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     await prefs.setString('bodyFat', _bodyFatController.text);
     await prefs.setString('Job', _selectedJob);
     await prefs.setString('fitnessGoal', _selectedGoal);
-    
+    await prefs.setString('Class', _class);
+
     await prefs.setInt('strengthStat', stats['strength']!);
     await prefs.setInt('agilityStat', stats['agility']!);
     await prefs.setInt('enduranceStat', stats['endurance']!);
     await prefs.setInt('vitalityStat', stats['vitality']!);
     await prefs.setInt('intelligenceStat', stats['intelligence']!);
+    await prefs.setInt('exp', 1);
+    await prefs.setInt('level', 1);
+    
     
     await prefs.setBool('profileCompleted', true);
   }
