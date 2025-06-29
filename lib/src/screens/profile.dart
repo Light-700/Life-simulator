@@ -279,12 +279,12 @@ class ProfilePage extends StatelessWidget {
                           dataSets: [
                   RadarDataSet(
                     dataEntries: [
-                      RadarEntry(value: (prefs.getDouble('strength') ?? 0)/200),
-                      RadarEntry(value: (prefs.getDouble('agility') ?? 0)/100),
-                      RadarEntry(value: (prefs.getDouble('endurance') ?? 0)/100),
-                      RadarEntry(value: (prefs.getDouble('intelligence') ?? 0)/100),
-                      RadarEntry(value:(prefs.getDouble('vitality') ?? 0)/100),
-                    ],
+          RadarEntry(value: (prefs.getInt('strengthStat') ?? 10).toDouble()),
+          RadarEntry(value: (prefs.getInt('agilityStat') ?? 10).toDouble()),
+          RadarEntry(value: (prefs.getInt('enduranceStat') ?? 10).toDouble()),
+          RadarEntry(value: (prefs.getInt('intelligenceStat') ?? 10).toDouble()),
+          RadarEntry(value: (prefs.getInt('vitalityStat') ?? 10).toDouble()),
+        ],
                      borderColor: Colors.amber,
                     fillColor: const Color.fromARGB(128, 76, 133, 180), 
                     borderWidth: 2,
