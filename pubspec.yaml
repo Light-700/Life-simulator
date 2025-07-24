@@ -6,12 +6,12 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 0.0.1+1
 
 environment:
-  sdk: ^3.1.1
+  sdk: ^3.8.0-278.1.beta
 
 dependencies:
   flutter:
     sdk: flutter
-  fl_chart: ^0.71.0 
+  fl_chart: ^1.0.0 
 
   english_words: ^4.0.0
   provider: ^6.0.0
@@ -22,7 +22,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
