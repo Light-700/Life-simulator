@@ -70,7 +70,7 @@ String _class ='S-class';
     int totalPossible = 600;
 
      if(totalStats>(0.9*totalPossible)){
-      _class='S-Class';
+      _class='S-class';
      }
      else if(totalStats>(0.75*totalPossible)){
       _class = 'A-class';
@@ -94,6 +94,7 @@ String _class ='S-class';
       'endurance': endurance,
       'vitality': vitality,
       'intelligence': intelligence,
+      'totalStats': totalStats
     };
   }
 
@@ -377,8 +378,7 @@ String _class ='S-class';
                 },
               ),
               const SizedBox(height: 15),
-              
-              // FIXED: Properly arranged in Row containers
+            
               _buildTextField(
                 controller: _restingHeartRateController,
                 label: 'Resting Heart Rate (bpm)',
@@ -596,7 +596,7 @@ String _class ='S-class';
                 ),
               ],
             ),
-          )).toList(),
+          )),
         ],
       ),
     );
@@ -615,15 +615,17 @@ String _class ='S-class';
     await prefs.setString('bodyFat', _bodyFatController.text);
     await prefs.setString('Job', _selectedJob);
     await prefs.setString('fitnessGoal', _selectedGoal);
-    await prefs.setString('Class', _class);
+    await prefs.setString('Class', _class); //calculated hunter class
 
     await prefs.setInt('strengthStat', stats['strength']!);
     await prefs.setInt('agilityStat', stats['agility']!);
     await prefs.setInt('enduranceStat', stats['endurance']!);
     await prefs.setInt('vitalityStat', stats['vitality']!);
     await prefs.setInt('intelligenceStat', stats['intelligence']!);
+    await prefs.setInt('totalStats', stats['totalStats']!);// total stats based on which class is determined
     await prefs.setInt('exp', 1);
     await prefs.setInt('level', 1);
+    await prefs.setInt('totExp', 100); // Base experience for level 1
     
     
     await prefs.setBool('profileCompleted', true);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-// ignore: unused_import
+import 'dart:async';
+
 import 'package:provider/provider.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -216,87 +217,279 @@ class _LoginScreenState extends State<LoginScreen> {
 
 class ProfileNotifier extends ChangeNotifier {
   static const String usernameKey = 'username';
+  static const String expKey = 'exp';
+  static const String levelKey = 'level';
+  static const String totExpKey = 'totExp';
+  static const String hunterClassKey = 'Class';
+  static const String completedTasksKey = 'completedTasks'; //i may remove if its unnecessary
+  
   String uname = "Fragment of Light"; // Default value
-  int _baseExp=1;
-  int baselevel=1;
+  int _baseExp = 1;
+  int baselevel = 1;
+  int _totalExp = 100; // Base total experience for level 1
+  String hunterClass = "E-class";
+   int _completedTasks = 0;  //i may remove if its unnecessary
+
+  List<Map<String, dynamic>> _pendingXPRewards = [];
+  Timer? _xpProcessingTimer;
+  bool _isProcessingXP = false;
+  
   ProfileNotifier() {
-    // constructor execution function to load the username and exp/level
-    _loadUsername();
+    //constructor to load user data
+    _loadUserData();
   }
   
   String get username => uname;
-  int get xp=> _baseExp;
+  int get xp => _baseExp;
   int get level => baselevel;
+  int get totalExp => _totalExp;
+  String get className => hunterClass;
+  int get completedTasks => _completedTasks; //i may remove if its unnecessary
   
-  // Load username from SharedPreferences
-  Future<void> _loadUsername() async {
+  // Load all user data from SharedPreferences
+  Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedUsername = prefs.getString(usernameKey); 
-    final savedexp = prefs.getInt('exp'); 
-
+    final savedUsername = prefs.getString(usernameKey);
+    final savedExp = prefs.getInt(expKey);
+    final savedLevel = prefs.getInt(levelKey);
+    final savedTotExp = prefs.getInt(totExpKey);
+    final savedClass = prefs.getString(hunterClassKey);
+    final savedCompletedTasks = prefs.getInt(completedTasksKey);  //i may remove if its unnecessary
+    final totalStats = prefs.getInt('totalStats'); // total stats for class determination
     
-    if (savedUsername != null) {
-      uname = savedUsername;
-      notifyListeners();
+     if (savedUsername != null) uname = savedUsername;
+    if (savedExp != null) _baseExp = savedExp;
+    if (savedCompletedTasks != null) _completedTasks = savedCompletedTasks;
+    if (savedClass != null) hunterClass = savedClass;
+    
+    if (savedLevel != null) {
+      baselevel = savedLevel;
+      _totalExp = getXPRequiredForLevel(baselevel); 
+      hunterClass = _calculateHunterRank(totalStats);/* need to change it because hunter class
+                                                   is not set by level but by stats*/
     }
-
-    if(savedexp != null){
-      _baseExp= savedexp;
-      notifyListeners();
-    }
+    
+    notifyListeners();
   }
   
   Future<void> updateName(String newuname) async {
     uname = newuname;
     
-    // Save to SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(usernameKey, newuname);
-     
+    
     notifyListeners();
   }
-
-  Future<void> updateXP(int exp) async {
-    _baseExp = _baseExp + exp;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('exp', _baseExp);
-    notifyListeners();
-  }
-
-  Future<void> updateLevel(int level) async{
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('level', level);
-    notifyListeners();
-  }
-
- Future<void> logout() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('isLoggedIn', false);
-  await prefs.setBool('profileCompleted', false);
-  await prefs.remove('username');
-  await prefs.remove('email');
-  await prefs.remove('password');
-  await prefs.remove('age');
-  await prefs.remove('weight');
-  await prefs.remove('height');
-  await prefs.remove('runningSpeed');
-  await prefs.remove('lungCapacity');
-  await prefs.remove('restingHeartRate');
-  await prefs.remove('bodyFat');
-  await prefs.remove('hunterClass');
-  await prefs.remove('fitnessGoal');
-  await prefs.remove('strengthStat');
-  await prefs.remove('agilityStat');
-  await prefs.remove('enduranceStat');
-  await prefs.remove('vitalityStat');
-  await prefs.remove('intelligenceStat');
   
-  uname = "Fragment of Light";
-  notifyListeners();
+  Future<void> updateXP(int exp, {String? taskName, String? taskType}) async {
+    // Add to pending rewards for batch processing
+    _pendingXPRewards.add({
+      'exp': exp,
+      'taskName': taskName ?? 'Unknown Task',
+      'taskType': taskType ?? 'General',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+    
+    // Update task counter
+    _completedTasks++;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(completedTasksKey, _completedTasks);
+    
+    // Schedule batch processing
+    _scheduleBatchProcessing();
+  }
+  
+    
+  void _scheduleBatchProcessing() {
+    _xpProcessingTimer?.cancel();
+    
+    // Allowing 500ms for multiple tasks to accumulate
+    _xpProcessingTimer = Timer(Duration(milliseconds: 500), () {
+      _processBatchedXP();
+    });
+  }
+  
+  Future<void> _processBatchedXP() async {
+    if (_isProcessingXP || _pendingXPRewards.isEmpty) return;
+    
+    _isProcessingXP = true;
+    
+    // Calculate total XP and prepare notifications
+    int totalXP = 0;
+    List<String> completedTasks = [];
+    Map<String, int> taskTypeXP = {};
+    
+    for (var reward in _pendingXPRewards) {
+      totalXP += reward['exp'] as int;
+      completedTasks.add(reward['taskName'] as String);
+      
+      String taskType = reward['taskType'] as String;
+      taskTypeXP[taskType] = (taskTypeXP[taskType] ?? 0) + (reward['exp'] as int);
+    }
+    
+    // Show batch completion notification
+    //await _showBatchCompletionNotification(completedTasks, totalXP, taskTypeXP); //batch completion notification
+    
+    // Process XP with multi-level support
+    await _processHunterProgression(_baseExp + totalXP);
+    
+    // Clear processed rewards
+    _pendingXPRewards.clear();
+    _isProcessingXP = false;
+    
+    notifyListeners();
+  }
+
+ Future<void> _processHunterProgression(int totalCurrentXP) async {
+    final prefs = await SharedPreferences.getInstance();
+    int currentLevel = baselevel;
+    int remainingXP = totalCurrentXP;
+    List<int> levelUps = [];
+    String oldRank = hunterClass;
+   int totalStats = prefs.getInt('totalStats') ?? 0; // total stats for class determination
+    
+    // Handle multiple level-ups like Sung Jinwoo's power spikes
+    while (remainingXP >= getXPRequiredForLevel(currentLevel)) {
+      remainingXP -= getXPRequiredForLevel(currentLevel);
+      currentLevel++;
+      levelUps.add(currentLevel);
+      
+      // Brief delay for dramatic effect
+      await Future.delayed(Duration(milliseconds: 200));
+    }
+    
+    // Update Hunter System data
+    if (levelUps.isNotEmpty) {
+      baselevel = currentLevel;
+      _totalExp = getXPRequiredForLevel(currentLevel);
+      int statPoint = levelUps.length * 5; // 5 stat points per level up
+      Map<String, int> statBonuses = _statDistribution(statPoint);
+      int strength= 0;
+      int agility = 0;  
+      int intelligence = 0;
+      int endurance = 0;
+      int vitality = 0;
+      strength+= statBonuses['strength'] ?? 0;
+      agility+= statBonuses['agility'] ?? 0;
+      intelligence+= statBonuses['intelligence'] ?? 0;
+      endurance+= statBonuses['endurance'] ?? 0;
+      vitality+= statBonuses['vitality'] ?? 0;
+    await prefs.setInt('strengthStat', strength);
+    await prefs.setInt('agilityStat', agility);
+    await prefs.setInt('enduranceStat', endurance);
+    await prefs.setInt('vitalityStat', vitality);
+    await prefs.setInt('intelligenceStat', intelligence);
+    totalStats += strength + agility + intelligence + endurance + vitality;
+      hunterClass = _calculateHunterRank(totalStats);
+
+    await prefs.setInt('totalStats', totalStats);
+      
+      //progression notifications
+     /* if (levelUps.length > 1) {
+        await _showMassivePowerSpike(levelUps.first - 1, currentLevel, levelUps.length);//shows power spike notification
+      } else {
+        await _showSingleLevelUp(levelUps.first - 1, levelUps.first);//shows single level up notification
+      }
+      
+      // class advancement
+      if (hunterClass != oldRank) {
+        await _showRankAdvancement(oldRank, hunterClass);//shows rank advancement notification 
+        await prefs.setString(hunterClassKey, hunterClass);
+      }*/ 
+      
+      // need to check and implement these notifications
+      
+      // Save progression data
+      await prefs.setInt(levelKey, currentLevel);
+      await prefs.setInt(totExpKey, _totalExp);
+    }
+    
+    _baseExp = remainingXP;
+    await prefs.setInt(expKey, _baseExp);
+    notifyListeners();
+  }
+
+Map<String, int> _statDistribution(int statPoints){
+  //apply based on the data from the hie database of tasks
+  return{
+    'intellience': (statPoints * 0.2).round(), // mock data
+  };
 }
 
+  int getXPRequiredForLevel(int level) {
+    if (level == 1) return 100;
+    
+    // Solo Leveling style: Different growth rates for different Hunter tiers
+    double growthRate = _getHunterGrowthRate(level);
+    int baseExp = 100;
+    
+    return (baseExp * pow(growthRate, level - 1)).round();
+  }
+  
+  double _getHunterGrowthRate(int level) {
+    if (level >= 150) return 1.15; // National Level Hunter (insane requirements)
+    if (level >= 90) return 1.12;  // S-Rank Hunter (very hard)
+    if (level >= 75) return 1.10;  // A-Rank Hunter (hard)
+    if (level >= 50) return 1.08;  // B-Rank Hunter (moderate)
+    if (level >= 25) return 1.07;  // C-Rank Hunter
+    return 1.06; // D-E Rank Hunter (easier for beginners)
+  }
+  
+  // SOLUTION 5: Hunter Rank System
+  String _calculateHunterRank(int ?totalStats) {
+//List<String> classes = ["E-class", "D-class", "C-class", "B-class", "A-class", "S-class",];
+int totalPossible = 600; // Total possible stats for a Hunter
+    if (totalStats == null) return "E-class"; // Default to E-class if no stats
+    if (totalStats> totalPossible) return "God Mode";
+    if (totalStats> (0.9*totalPossible)) return "S-class";
+    if (totalStats> (0.75*totalPossible)) return "A-class";
+    if (totalStats> (0.65*totalPossible)) return "B-class";
+    if (totalStats> (0.55*totalPossible)) return "C-class ";
+    if (totalStats> (0.4*totalPossible)) return "D-class";
+    return "E-class"; 
+  }
+
+   double getXPProgress() {
+    if (_totalExp == 0) return 0.0;
+    return _baseExp / _totalExp;
+  }
+  
+  int getXPNeededForNextLevel() {
+    return _totalExp - _baseExp;
+  }
+  
+  int getTotalXPEarned() {
+    int totalXP = _baseExp;
+    for (int i = 1; i < baselevel; i++) {
+      totalXP += getXPRequiredForLevel(i);
+    }
+    return totalXP;
+  }
+  
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Cancel any pending processing
+    _xpProcessingTimer?.cancel();
+    
+    // Clear all data
+    await prefs.clear();
+    
+    // Reset to default values
+    uname = "Fragment of Light";
+    _baseExp = 0;
+    baselevel = 1;
+    _totalExp = 100;
+    hunterClass = "E-Rank Hunter";
+    _completedTasks = 0;
+    _pendingXPRewards.clear();
+    _isProcessingXP = false;
+    
+    notifyListeners();
+  }
 
 }
+
 
 class MyHomePage extends StatefulWidget {
   

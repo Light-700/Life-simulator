@@ -11,7 +11,7 @@ class ProfilePage extends StatelessWidget {
   const ProfilePage({
     super.key,
     required this.navigator,
-  });
+  }); 
 
   @override
 
@@ -219,9 +219,7 @@ class ProfilePage extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 12),
                                         Text(
-                                          "${profileNotifier.xp}/100 XP",/* add a base exp in here and the formula for
-                                                                          base exp is =baseXp*(1+class_const)^n, where n is the level   
-                                                                                                                  and class_const is a constant based on class*/
+                                          "${profileNotifier.xp}/100 XP",
                                           style: TextStyle(
                                             color: Color.fromARGB(255, 255, 254, 254),
                                             fontSize: 12,
@@ -313,12 +311,12 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ),
                       color: const Color.fromARGB(255, 37, 29, 29),
-                      child: const Padding(
+                      child:  Padding(
                         padding: EdgeInsets.all(16.0),
                         child: Column(
                           children: [
                             Text(
-                              "Level 1",
+                              "Level ${profileNotifier.level}",
                               style: TextStyle(
                                 color: Color.fromARGB(255, 18, 187, 238),
                                 fontSize: 20,
@@ -327,7 +325,7 @@ class ProfilePage extends StatelessWidget {
                             ),
                             SizedBox(height: 8),
                             Text(
-                              "Novice",
+                              prefs.getString('Class') ?? "Class not set",
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 16,
