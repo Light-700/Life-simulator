@@ -792,7 +792,7 @@ class RealHome extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 70, bottom: 15, left: 10, right:10),
               child: LinearProgressIndicator(
-                value: 0.7,
+                value: Provider.of<ProfileNotifier>(context).getXPProgress(),
                 minHeight: 15,
                 borderRadius: BorderRadius.circular(10),
                 color: const Color.fromARGB(255, 238, 33, 18),

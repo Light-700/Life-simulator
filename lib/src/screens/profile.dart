@@ -210,7 +210,7 @@ class ProfilePage extends StatelessWidget {
                                       children: [
                                         Expanded(
                                           child: LinearProgressIndicator(
-                                            value: 0.01,
+                                            value: Provider.of<ProfileNotifier>(context).getXPProgress(),
                                             minHeight: 18,
                                             borderRadius: BorderRadius.circular(10),
                                             color: const Color.fromARGB(255, 238, 179, 18),
@@ -219,7 +219,7 @@ class ProfilePage extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 12),
                                         Text(
-                                          "${profileNotifier.xp}/100 XP",
+                                          "${profileNotifier.xp}/${profileNotifier.totalExp} XP",
                                           style: TextStyle(
                                             color: Color.fromARGB(255, 255, 254, 254),
                                             fontSize: 12,
