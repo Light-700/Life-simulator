@@ -12,10 +12,13 @@ import 'src/screens/tasks.dart';
 import 'src/screens/extended_login.dart';
 import 'services/task_database.dart';
 import 'models/task_model.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async { 
   WidgetsFlutterBinding.ensureInitialized();
   await TaskDatabase.initialize();
+
+  await NotificationService().initialize();
   
   // Check if user is logged in and profile is completed
   final prefs = await SharedPreferences.getInstance();
@@ -329,7 +332,8 @@ class ProfileNotifier extends ChangeNotifier {
     if (_isProcessingXP || _pendingXPRewards.isEmpty) return;
     
     _isProcessingXP = true;
-    
+    final notify= NotificationService();
+
     // Calculate total XP and prepare notifications
     int totalXP = 0;
     List<String> completedTasks = [];
@@ -344,7 +348,7 @@ class ProfileNotifier extends ChangeNotifier {
     }
     
     // Show batch completion notification
-    //await _showBatchCompletionNotification(completedTasks, totalXP, taskTypeXP); //batch completion notification
+    await notify.showBatchCompletionNotification(completedTasks, totalXP, taskTypeXP); //batch completion notification
     
     // Process XP with multi-level support
     await _processHunterProgression(_baseExp + totalXP);
@@ -358,6 +362,9 @@ class ProfileNotifier extends ChangeNotifier {
 
  Future<void> _processHunterProgression(int totalCurrentXP) async {
     final prefs = await SharedPreferences.getInstance();
+    final notify= NotificationService();
+    await notify.initialize();
+
     int currentLevel = baselevel;
     int remainingXP = totalCurrentXP;
     List<int> levelUps = [];
@@ -388,6 +395,8 @@ class ProfileNotifier extends ChangeNotifier {
 
     int newTotalStats =await  _applyStatBonuses(statBonuses);
      hunterClass = _calculateHunterRank(newTotalStats);
+
+      await NotificationService().showStatPointAllocation(statBonuses, statPoint);
     
 /*
       int strength= 0;
@@ -411,15 +420,15 @@ class ProfileNotifier extends ChangeNotifier {
     //initial anchor point for stat bonuses
        
       //progression notifications
-     /* if (levelUps.length > 1) {
-        await _showMassivePowerSpike(levelUps.first - 1, currentLevel, levelUps.length);//shows power spike notification
+      if (levelUps.length > 1) {
+        await notify.showMassivePowerSpike(levelUps.first - 1, currentLevel, levelUps.length);//shows power spike notification
       } else {
-        await _showSingleLevelUp(levelUps.first - 1, levelUps.first);//shows single level up notification
+        await notify.showSingleLevelUp(levelUps.first - 1, levelUps.first);//shows single level up notification
       }
       
       // class advancement*/
       if (hunterClass != oldRank) {
-       // await _showRankAdvancement(oldRank, hunterClass);//shows rank advancement notification 
+       await notify.showRankAdvancement(oldRank, hunterClass);//shows rank advancement notification 
         await prefs.setString(hunterClassKey, hunterClass);
       }
       

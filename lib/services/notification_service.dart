@@ -206,12 +206,13 @@ class NotificationService {
 
   String _getRankAdvancementMessage(String oldRank, String newRank) {
     Map<String, String> rankMessages = {
-      'S-class': '🌟 You have reached the pinnacle of Hunter society! National Level Hunter status achieved!',
-      'A-class': '⭐ Elite Hunter status! You are among the strongest!',
-      'B-class': '🔸 High-tier Hunter! Your skills are impressive!',
-      'C-class': '🔹 Mid-tier Hunter! Steady progress continues!',
-      'D-class': '📋 Low-tier Hunter! Keep training!',
-      'E-class': '📝 Beginner Hunter! Your journey starts here!',
+      'God-Mode': '🌟 You have broken the barriers of perseverance! You are entered in GOD-Mode 🔥!',
+      'S-class': '🌟 You have reached the level of the innately strongest of society! You have one of the most elite players!',
+      'A-class': '⭐ congratulations! you have become A-class Player! You are among the best of the best!',
+      'B-class': '🔸 congratulations! you have become B-class Player! Your skills are impressive!',
+      'C-class': '🔹 congratulations! you have become C-class Player! Steady progress continues!',
+      'D-class': '📋 congratulations! you have become D-class Player! Keep training!',
+      'E-class': '📝 Beginner Player! Your journey starts here!',
     };
     
     return rankMessages[newRank] ?? 'Your Hunter ranking has improved!';
