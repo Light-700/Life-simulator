@@ -23,13 +23,16 @@ class TaskModelAdapter extends TypeAdapter<TaskModel> {
       completedAtLevel: fields[3] as int,
       completedAt: fields[4] as DateTime,
       id: fields[5] as String,
+      normalizedTaskType: fields[6] as String?,
+      difficulty: fields[7] as int,
+      metadata: (fields[8] as Map?)?.cast<String, dynamic>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.taskName)
       ..writeByte(1)
@@ -41,7 +44,13 @@ class TaskModelAdapter extends TypeAdapter<TaskModel> {
       ..writeByte(4)
       ..write(obj.completedAt)
       ..writeByte(5)
-      ..write(obj.id);
+      ..write(obj.id)
+      ..writeByte(6)
+      ..write(obj.normalizedTaskType)
+      ..writeByte(7)
+      ..write(obj.difficulty)
+      ..writeByte(8)
+      ..write(obj.metadata);
   }
 
   @override

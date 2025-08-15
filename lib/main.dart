@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:provider/provider.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -227,260 +228,80 @@ class ProfileNotifier extends ChangeNotifier {
   static const String levelKey = 'level';
   static const String totExpKey = 'totExp';
   static const String hunterClassKey = 'Class';
-  static const String completedTasksKey = 'completedTasks'; //i may remove if its unnecessary
-  
-  String uname = "Fragment of Light"; // Default value
+  static const String completedTasksKey = 'completedTasks';
+
+  String uname = "Fragment of Light";
   int _baseExp = 1;
   int baselevel = 1;
-  int _totalExp = 100; // Base total experience for level 1
+  int _totalExp = 100;
   String hunterClass = "E-class";
-  int _completedTasks = 0;  //i may remove if its unnecessary
+  int _completedTasks = 0;
   int _previousLevel = 1;
-
+  
+  // Optimized batch processing
   List<Map<String, dynamic>> _pendingXPRewards = [];
   Timer? _xpProcessingTimer;
   bool _isProcessingXP = false;
   
-  ProfileNotifier() {
-    //constructor to load user data
-    _loadUserData();
-  }
+  // Performance optimization: Cache frequently accessed data
+  Map<String, int>? _cachedStats;
+  DateTime? _lastStatsCacheTime;
+  static const Duration _statsCacheDuration = Duration(minutes: 5);
   
+  // Background computation isolate
+  Isolate? _computationIsolate;
+  ReceivePort? _isolateReceivePort;
+
+  ProfileNotifier() {
+    _loadUserData();
+    _initializeBackgroundComputation();
+  }
+
   String get username => uname;
   int get xp => _baseExp;
   int get level => baselevel;
   int get totalExp => _totalExp;
   String get className => hunterClass;
-  int get completedTasks => _completedTasks; //i may remove if its unnecessary
-  
-  // Load all user data from SharedPreferences
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedUsername = prefs.getString(usernameKey);
-    final savedExp = prefs.getInt(expKey);
-    final savedLevel = prefs.getInt(levelKey);
-    final savedTotExp = prefs.getInt(totExpKey);
-    final savedClass = prefs.getString(hunterClassKey);
-    final savedCompletedTasks = prefs.getInt(completedTasksKey);  //i may remove if its unnecessary
-    final totalStats = prefs.getInt('totalStats'); // total stats for class determination
-    
-     if (savedUsername != null) uname = savedUsername;
-    if (savedExp != null) _baseExp = savedExp;
-    if (savedCompletedTasks != null) _completedTasks = savedCompletedTasks;
-    if (savedClass != null) hunterClass = savedClass;
-    
-    if (savedLevel != null) {
-      baselevel = savedLevel;
-      _totalExp = getXPRequiredForLevel(baselevel); 
-      hunterClass = _calculateHunterRank(totalStats);/* need to change it because hunter class
-                                                   is not set by level but by stats*/
-    }
-    
-    notifyListeners();
-  }
-  
-  Future<void> updateName(String newuname) async {
-    uname = newuname;
-    
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(usernameKey, newuname);
-    
-    notifyListeners();
-  }
-  
-  Future<void> updateXP(int exp, {String? taskName, String? taskType}) async {
-    _previousLevel = baselevel;
+  int get completedTasks => _completedTasks;
 
-     final task = TaskModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      taskName: taskName ?? 'Unknown Task',
-      taskType: taskType ?? 'General',
-      xpReward: exp,
-      completedAtLevel: baselevel, // Current level when task was completed
-      completedAt: DateTime.now(),
+  // Initialize background computation isolate for heavy operations
+  Future<void> _initializeBackgroundComputation() async {
+    _isolateReceivePort = ReceivePort();
+    _computationIsolate = await Isolate.spawn(
+      _backgroundComputationEntryPoint,
+      _isolateReceivePort!.sendPort,
     );
-
-    await TaskDatabase.addCompletedTask(task);
-
-    _pendingXPRewards.add({
-      'exp': exp,
-      'taskName': taskName ?? 'Unknown Task',
-      'taskType': taskType ?? 'General',
-      'timestamp': DateTime.now().millisecondsSinceEpoch,
-    });
-    
-    // Update task counter
-    _completedTasks++;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(completedTasksKey, _completedTasks);
-    
-    // Schedule batch processing
-    _scheduleBatchProcessing();
   }
-  
-    
-  void _scheduleBatchProcessing() {
-    _xpProcessingTimer?.cancel();
-    
-    // Allowing 500ms for multiple tasks to accumulate
-    _xpProcessingTimer = Timer(Duration(milliseconds: 500), () {
-      _processBatchedXP();
+
+  // Background isolate entry point
+  static void _backgroundComputationEntryPoint(SendPort sendPort) {
+    final receivePort = ReceivePort();
+    sendPort.send(receivePort.sendPort);
+
+    receivePort.listen((message) async {
+      if (message is Map<String, dynamic>) {
+        switch (message['type']) {
+          case 'calculateStats':
+            final result = await _performStatCalculation(
+              message['totalPoints'],
+              message['fromLevel'],
+              message['toLevel'],
+            );
+            sendPort.send({'type': 'statsResult', 'result': result});
+        }
+      }
     });
   }
-  
-  Future<void> _processBatchedXP() async {
-    if (_isProcessingXP || _pendingXPRewards.isEmpty) return;
-    
-    _isProcessingXP = true;
-    final notify= NotificationService();
 
-    // Calculate total XP and prepare notifications
-    int totalXP = 0;
-    List<String> completedTasks = [];
-    Map<String, int> taskTypeXP = {};
-    
-    for (var reward in _pendingXPRewards) {
-      totalXP += reward['exp'] as int;
-      completedTasks.add(reward['taskName'] as String);
-      
-      String taskType = reward['taskType'] as String;
-      taskTypeXP[taskType] = (taskTypeXP[taskType] ?? 0) + (reward['exp'] as int);
-    }
-    
-    // Show batch completion notification
-    await notify.showBatchCompletionNotification(completedTasks, totalXP, taskTypeXP); //batch completion notification
-    
-    // Process XP with multi-level support
-    await _processHunterProgression(_baseExp + totalXP);
-    
-    // Clear processed rewards
-    _pendingXPRewards.clear();
-    _isProcessingXP = false;
-    
-    notifyListeners();
-  }
-
- Future<void> _processHunterProgression(int totalCurrentXP) async {
-    final prefs = await SharedPreferences.getInstance();
-    final notify= NotificationService();
-    await notify.initialize();
-
-    int currentLevel = baselevel;
-    int remainingXP = totalCurrentXP;
-    List<int> levelUps = [];
-    String oldRank = hunterClass;
-   //int totalStats = prefs.getInt('totalStats') ?? 0; 
-   int levelUpStartLevel = _previousLevel;
-
-    // Handle multiple level-ups like Sung Jinwoo's power spikes
-    while (remainingXP >= getXPRequiredForLevel(currentLevel)) {
-      remainingXP -= getXPRequiredForLevel(currentLevel);
-      currentLevel++;
-      levelUps.add(currentLevel);
-      
-      // Brief delay for dramatic effect
-      await Future.delayed(Duration(milliseconds: 200));
-    }
-    
-    // Update Hunter System data
-    if (levelUps.isNotEmpty) {
-      baselevel = currentLevel;
-      _totalExp = getXPRequiredForLevel(currentLevel);
-      int statPoint = levelUps.length * 5; // 5 stat points per level up
-      Map<String, int> statBonuses = _calculateStatBonusesFromTasks(
-        statPoint, 
-        levelUpStartLevel, 
-        currentLevel
-      );
-
-    int newTotalStats =await  _applyStatBonuses(statBonuses);
-     hunterClass = _calculateHunterRank(newTotalStats);
-
-      await NotificationService().showStatPointAllocation(statBonuses, statPoint);
-    
-/*
-      int strength= 0;
-      int agility = 0;  
-      int intelligence = 0;
-      int endurance = 0;
-      int vitality = 0;
-      strength+= statBonuses['strength'] ?? 0;
-      agility+= statBonuses['agility'] ?? 0;
-      intelligence+= statBonuses['intelligence'] ?? 0;
-      endurance+= statBonuses['endurance'] ?? 0;
-      vitality+= statBonuses['vitality'] ?? 0;
-    await prefs.setInt('strengthStat', strength);
-    await prefs.setInt('agilityStat', agility);
-    await prefs.setInt('enduranceStat', endurance);
-    await prefs.setInt('vitalityStat', vitality);
-    await prefs.setInt('intelligenceStat', intelligence);
-    totalStats += strength + agility + intelligence + endurance + vitality;
-      */ 
-
-    //initial anchor point for stat bonuses
-       
-      //progression notifications
-      if (levelUps.length > 1) {
-        await notify.showMassivePowerSpike(levelUps.first - 1, currentLevel, levelUps.length);//shows power spike notification
-      } else {
-        await notify.showSingleLevelUp(levelUps.first - 1, levelUps.first);//shows single level up notification
-      }
-      
-      // class advancement*/
-      if (hunterClass != oldRank) {
-       await notify.showRankAdvancement(oldRank, hunterClass);//shows rank advancement notification 
-        await prefs.setString(hunterClassKey, hunterClass);
-      }
-      
-      // need to check and implement these notifications
-      
-      // Save progression data
-      await prefs.setInt(levelKey, currentLevel);
-      await prefs.setInt(totExpKey, _totalExp);
-      
-      await prefs.setInt('totalStats', newTotalStats);
-    }
-    
-    _baseExp = remainingXP;
-    await prefs.setInt(expKey, _baseExp);
-    notifyListeners();
-  }
-
-   Future<int> _applyStatBonuses(Map<String, int> bonuses) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // Update individual stats
-    int currentStrength = prefs.getInt('strengthStat') ?? 0;
-    int currentAgility = prefs.getInt('agilityStat') ?? 0;
-    int currentEndurance = prefs.getInt('enduranceStat') ?? 0;
-    int currentVitality = prefs.getInt('vitalityStat') ?? 0;
-    int currentIntelligence = prefs.getInt('intelligenceStat') ?? 0;
-    
-    await prefs.setInt('strengthStat', currentStrength + (bonuses['strength'] ?? 0));
-    await prefs.setInt('agilityStat', currentAgility + (bonuses['agility'] ?? 0));
-    await prefs.setInt('enduranceStat', currentEndurance + (bonuses['endurance'] ?? 0));
-    await prefs.setInt('vitalityStat', currentVitality + (bonuses['vitality'] ?? 0));
-    await prefs.setInt('intelligenceStat', currentIntelligence + (bonuses['intelligence'] ?? 0));
-    
-    // Update total stats
-    int newTotalStats = (currentStrength + (bonuses['strength'] ?? 0)) +
-                       (currentAgility + (bonuses['agility'] ?? 0)) +
-                       (currentEndurance + (bonuses['endurance'] ?? 0)) +
-                       (currentVitality + (bonuses['vitality'] ?? 0)) +
-                       (currentIntelligence + (bonuses['intelligence'] ?? 0));
-    
-    await prefs.setInt('totalStats', newTotalStats);
-
-    return newTotalStats;
-  }
-
-
-  Map<String, int> _calculateStatBonusesFromTasks(int totalPoints, int fromLevel, int toLevel) {
-    // Get tasks completed between level range from Hive
-    List<TaskModel> relevantTasks = TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
+  // Heavy stat calculation in background isolate
+  static Future<Map<String, int>> _performStatCalculation(
+    int totalPoints,
+    int fromLevel,
+    int toLevel,
+  ) async {
+    final relevantTasks =await TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
     
     if (relevantTasks.isEmpty) {
-      // Default distribution if no tasks found
       return {
         'strength': (totalPoints * 0.2).round(),
         'agility': (totalPoints * 0.2).round(),
@@ -489,105 +310,315 @@ class ProfileNotifier extends ChangeNotifier {
         'intelligence': (totalPoints * 0.2).round(),
       };
     }
+
+    final taskTypeCounts = <String, int>{
+      'Strength': 0,
+      'Agility': 0,
+      'Endurance': 0,
+      'Vitality': 0,
+      'Intelligence': 0,
+    };
+
+    for (final task in relevantTasks) {
+      final normalized = _normalizeTaskType(task.taskType);
+      if (taskTypeCounts.containsKey(normalized)) {
+        taskTypeCounts[normalized] = taskTypeCounts[normalized]! + 1;
+      }
+    }
+
+    return _distributePointsByTaskShare(
+      taskTypeCounts: taskTypeCounts,
+      totalPoints: totalPoints,
+    );
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
     
-final Map<String, int> taskTypeCounts = {
-  'Strength': 0,
-  'Agility': 0,
-  'Endurance': 0,
-  'Vitality': 0,
-  'Intelligence': 0,
-};
+    // Batch load all data at once for better performance
+    final futures = <Future<dynamic>>[
+  Future.value(prefs.getString(usernameKey)),
+  Future.value(prefs.getInt(expKey)),
+  Future.value(prefs.getInt(levelKey)),
+  Future.value(prefs.getInt(totExpKey)),
+  Future.value(prefs.getString(hunterClassKey)),
+  Future.value(prefs.getInt(completedTasksKey)),
+  Future.value(prefs.getInt('totalStats')),
+];
 
-for (final task in relevantTasks) {
-  final normalized = _normalizeTaskType(task.taskType);
-  if (taskTypeCounts.containsKey(normalized)) {
-    taskTypeCounts[normalized] = taskTypeCounts[normalized]! + 1;
-  }
-}
-
-final hasAny = taskTypeCounts.values.any((v) => v > 0);
-if (!hasAny) {
-  // Even split fallback (optional); otherwise return zeros as-is
-  final per = (totalPoints / taskTypeCounts.length).floor();
-  final Map<String, int> even = {
-    for (final k in taskTypeCounts.keys) k.toLowerCase(): per
-  };
-  // Distribute remainder deterministically by key
-  int rem = totalPoints - per * taskTypeCounts.length;
-  final keys = taskTypeCounts.keys.map((k) => k.toLowerCase()).toList()..sort();
-  for (int i = 0; i < rem; i++) {
-    even[keys[i]] = even[keys[i]]! + 1;
-  }
-  return even;
-}
-final statBonuses = distributePointsByTaskShare(
-  taskTypeCounts: taskTypeCounts,
-  totalPoints: totalPoints,
-);
-
-return statBonuses;
+    final results = await Future.wait(futures);
+    
+    if (results[0] != null) uname = results[0] as String;
+    if (results[1] != null) _baseExp = results[1] as int;
+    if (results[5] != null) _completedTasks = results[5] as int;
+    if (results[4] != null) hunterClass = results[4] as String;
+    if (results[2] != null) {
+      baselevel = results[2] as int;
+      _totalExp = getXPRequiredForLevel(baselevel);
+      hunterClass = _calculateHunterRank(results[6] as int?);
+    }
+    notifyListeners();
   }
 
-  /// Fair, exact distribution using the Largest Remainder (Hamilton) method.
-/// - Respects proportions from taskTypeCounts
-/// - Guarantees sum(result) == totalPoints
-/// - Deterministic tie-breaking by stat key
-/// I  took the elp of chatGPT for this
-Map<String, int> distributePointsByTaskShare({
-  required Map<String, int> taskTypeCounts, 
-  required int totalPoints,
-}) {
-  // Normalize to positive-count entries for proportion; keep zeros in result
-  final positive = taskTypeCounts.entries.where((e) => e.value > 0).toList();
-
-  // Initialize result for all known stats (lowercased keys)
-  final Map<String, int> result = {
-    for (final k in taskTypeCounts.keys) k.toLowerCase(): 0,
-  };
-
-  // If no tasks found in the range, keep everything at 0 (caller can fallback)
-  if (positive.isEmpty) {
-    return result;
+  Future<void> updateName(String newuname) async {
+    uname = newuname;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(usernameKey, newuname);
+    notifyListeners();
   }
 
-  final int totalCount =
-      positive.fold<int>(0, (sum, e) => sum + e.value);
-
-  // First pass: base = floor(raw share), track remainder
-  int allocated = 0;
-  final List<MapEntry<String, double>> remainders = [];
-
-  for (final e in positive) {
-    final key = e.key.toLowerCase();
-    final double share = e.value / totalCount;
-    final double raw = totalPoints * share;
-    final int base = raw.floor();
-    final double remainder = raw - base;
-
-    result[key] = base;
-    allocated += base;
-    remainders.add(MapEntry(key, remainder));
-  }
-
-  // Distribute the remaining points to the largest remainders
-  int remaining = totalPoints - allocated;
-  if (remaining > 0) {
-    // Sort by remainder desc; tie-break by key asc to be deterministic
-    remainders.sort((a, b) {
-      final c = b.value.compareTo(a.value);
-      return c != 0 ? c : a.key.compareTo(b.key);
+  Future<void> updateXP(int exp, {String? taskName, String? taskType}) async {
+    _previousLevel = baselevel;
+    
+    // Use background isolate for task creation to avoid main thread blocking
+    final task = TaskModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      taskName: taskName ?? 'Unknown Task',
+      taskType: taskType ?? 'General',
+      xpReward: exp,
+      completedAtLevel: baselevel,
+      completedAt: DateTime.now(),
+    );
+    
+    // Store task in background to avoid blocking UI
+    unawaited(TaskDatabase.addCompletedTask(task));
+    
+    _pendingXPRewards.add({
+      'exp': exp,
+      'taskName': taskName ?? 'Unknown Task',
+      'taskType': taskType ?? 'General',
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
     });
-    for (int i = 0; i < remaining; i++) {
-      final k = remainders[i % remainders.length].key;
-      result[k] = (result[k] ?? 0) + 1;
+
+    _completedTasks++;
+    
+    // Batch SharedPreferences updates
+    unawaited(_batchUpdatePreferences());
+    
+    _scheduleBatchProcessing();
+  }
+
+  // Optimized batch preferences update
+  Future<void> _batchUpdatePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(completedTasksKey, _completedTasks);
+  }
+
+  void _scheduleBatchProcessing() {
+    _xpProcessingTimer?.cancel();
+    _xpProcessingTimer = Timer(const Duration(milliseconds: 300), () {
+      _processBatchedXP();
+    });
+  }
+
+  Future<void> _processBatchedXP() async {
+    if (_isProcessingXP || _pendingXPRewards.isEmpty) return;
+    _isProcessingXP = true;
+
+    try {
+      int totalXP = 0;
+      final completedTasks = <String>[];
+      final taskTypeXP = <String, int>{};
+
+      for (final reward in _pendingXPRewards) {
+        totalXP += reward['exp'] as int;
+        completedTasks.add(reward['taskName'] as String);
+        final taskType = reward['taskType'] as String;
+        taskTypeXP[taskType] = (taskTypeXP[taskType] ?? 0) + (reward['exp'] as int);
+      }
+
+      // Show notification usin unawaited
+      unawaited(NotificationService().showBatchCompletionNotification(
+        completedTasks, 
+        totalXP, 
+        taskTypeXP
+      ));
+
+      await _processHunterProgression(_baseExp + totalXP);
+
+      _pendingXPRewards.clear();
+    } finally {
+      _isProcessingXP = false;
+      notifyListeners();
     }
   }
 
-  return result;
-}
+  // Optimized progression processing with background computation
+  Future<void> _processHunterProgression(int totalCurrentXP) async {
+    final prefs = await SharedPreferences.getInstance();
+    int currentLevel = baselevel;
+    int remainingXP = totalCurrentXP;
+    final levelUps = <int>[];
+    final oldRank = hunterClass;
+    final levelUpStartLevel = _previousLevel;
 
+    while (remainingXP >= getXPRequiredForLevel(currentLevel)) {
+      remainingXP -= getXPRequiredForLevel(currentLevel);
+      currentLevel++;
+      levelUps.add(currentLevel);
+      
+      // Yield control to prevent blocking of main thread
+      if (levelUps.length % 5 == 0) {
+        await Future.delayed(Duration.zero);
+      }
+    }
 
-    String _normalizeTaskType(String taskType) {
+    if (levelUps.isNotEmpty) {
+      baselevel = currentLevel;
+      _totalExp = getXPRequiredForLevel(currentLevel);
+      final statPoint = levelUps.length * 5;
+
+      // Using cached stats if available and recent
+      Map<String, int> statBonuses;
+      if (_shouldUseCachedStats()) {
+        statBonuses = _cachedStats!;
+      } else {
+        // Calculate stats in background isolate
+        statBonuses = await _calculateStatBonusesInBackground(
+          statPoint,
+          levelUpStartLevel,
+          currentLevel
+        );
+        _cacheStats(statBonuses);
+      }
+
+      final newTotalStats = await _applyStatBonuses(statBonuses);
+      hunterClass = _calculateHunterRank(newTotalStats);
+
+      final notificationFutures = <Future>[];
+      
+      notificationFutures.add(
+        NotificationService().showStatPointAllocation(statBonuses, statPoint)
+      );
+
+      if (levelUps.length > 1) {
+        notificationFutures.add(
+          NotificationService().showMassivePowerSpike(
+            levelUps.first - 1, 
+            currentLevel, 
+            levelUps.length
+          )
+        );
+      } else {
+        notificationFutures.add(
+          NotificationService().showSingleLevelUp(levelUps.first - 1, levelUps.first)
+        );
+      }
+
+      if (hunterClass != oldRank) {
+        notificationFutures.add(
+          NotificationService().showRankAdvancement(oldRank, hunterClass)
+        );
+      }
+
+      // Execute all notifications in parallel
+      unawaited(Future.wait(notificationFutures));
+
+      // Batch save all progression data
+      await _batchSaveProgressionData(prefs, currentLevel, newTotalStats);
+    }
+
+    _baseExp = remainingXP;
+    await prefs.setInt(expKey, _baseExp);
+    notifyListeners();
+  }
+
+  Future<int> _applyStatBonuses(Map<String, int> bonuses) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Batch read current stats usin the future class
+    final currentStats = <String, int>{};
+    final futures = <Future<int?>>[];
+    final statKeys = ['strengthStat', 'agilityStat', 'enduranceStat', 'vitalityStat', 'intelligenceStat'];
+    
+    for (final key in statKeys) {
+      futures.add(Future.value(prefs.getInt(key)));
+    }
+    
+    final results = await Future.wait(futures);
+    for (int i = 0; i < statKeys.length; i++) {
+      currentStats[statKeys[i]] = results[i] ?? 0;
+    }
+
+    final newStats = <String, int>{
+      'strengthStat': currentStats['strengthStat']! + (bonuses['strength'] ?? 0),
+      'agilityStat': currentStats['agilityStat']! + (bonuses['agility'] ?? 0),
+      'enduranceStat': currentStats['enduranceStat']! + (bonuses['endurance'] ?? 0),
+      'vitalityStat': currentStats['vitalityStat']! + (bonuses['vitality'] ?? 0),
+      'intelligenceStat': currentStats['intelligenceStat']! + (bonuses['intelligence'] ?? 0),
+    };
+
+    final writeFutures = <Future<bool>>[];
+    for (final entry in newStats.entries) {
+      writeFutures.add(prefs.setInt(entry.key, entry.value));
+    }
+    
+    await Future.wait(writeFutures);
+
+    final newTotalStats = newStats.values.reduce((a, b) => a + b);
+    await prefs.setInt('totalStats', newTotalStats);
+
+    return newTotalStats;
+  }
+
+  // Cache management for frequently accessed stats
+  bool _shouldUseCachedStats() {
+    return _cachedStats != null && 
+           _lastStatsCacheTime != null && 
+           DateTime.now().difference(_lastStatsCacheTime!).compareTo(_statsCacheDuration) < 0;
+  }
+
+  void _cacheStats(Map<String, int> stats) {
+    _cachedStats = Map<String, int>.from(stats);
+    _lastStatsCacheTime = DateTime.now();
+  }
+
+  Future<void> _batchSaveProgressionData(
+    SharedPreferences prefs, 
+    int currentLevel, 
+    int newTotalStats
+  ) async {
+    final futures = <Future<bool>>[
+      prefs.setInt(levelKey, currentLevel),
+      prefs.setInt(totExpKey, _totalExp),
+      prefs.setInt('totalStats', newTotalStats),
+      prefs.setString(hunterClassKey, hunterClass),
+    ];
+
+    await Future.wait(futures);
+  }
+
+  // Background stat calculation method
+  Future<Map<String, int>> _calculateStatBonusesInBackground(
+    int totalPoints,
+    int fromLevel,
+    int toLevel,
+  ) async {
+    final completer = Completer<Map<String, int>>();
+    
+    if (_isolateReceivePort != null) {
+      final subscription = _isolateReceivePort!.listen((message) {
+        if (message is Map<String, dynamic> && message['type'] == 'statsResult') {
+          completer.complete(message['result'] as Map<String, int>);
+        }
+      });
+
+      _isolateReceivePort!.sendPort.send({
+        'type': 'calculateStats',
+        'totalPoints': totalPoints,
+        'fromLevel': fromLevel,
+        'toLevel': toLevel,
+      });
+
+      final result = await completer.future;
+      await subscription.cancel();
+      return result;
+    }
+
+    return _calculateStatBonusesFromTasks(totalPoints, fromLevel, toLevel);
+  }
+
+  static String _normalizeTaskType(String taskType) {
     switch (taskType.toLowerCase()) {
       case 'strength':
       case 'physical':
@@ -611,52 +642,123 @@ Map<String, int> distributePointsByTaskShare({
       case 'mental':
         return 'Intelligence';
       default:
-        return 'Intelligence'; // Default to intelligence for unknown types
+        return 'Intelligence';
     }
+  }
+
+  static Map<String, int> _distributePointsByTaskShare({
+    required Map<String, int> taskTypeCounts,
+    required int totalPoints,
+  }) {
+    final positive = taskTypeCounts.entries.where((e) => e.value > 0).toList();
+    final result = <String, int>{
+      for (final k in taskTypeCounts.keys) k.toLowerCase(): 0,
+    };
+
+    if (positive.isEmpty) return result;
+
+    final totalCount = positive.fold<int>(0, (sum, e) => sum + e.value);
+    int allocated = 0;
+    final remainders = <MapEntry<String, double>>[];
+
+    for (final e in positive) {
+      final key = e.key.toLowerCase();
+      final double share = e.value / totalCount;
+      final double raw = totalPoints * share;
+      final int base = raw.floor();
+      final double remainder = raw - base;
+
+      result[key] = base;
+      allocated += base;
+      remainders.add(MapEntry(key, remainder));
+    }
+
+    int remaining = totalPoints - allocated;
+    if (remaining > 0) {
+      remainders.sort((a, b) {
+        final c = b.value.compareTo(a.value);
+        return c != 0 ? c : a.key.compareTo(b.key);
+      });
+      for (int i = 0; i < remaining; i++) {
+        final k = remainders[i % remainders.length].key;
+        result[k] = (result[k] ?? 0) + 1;
+      }
+    }
+
+    return result;
+  }
+
+  Future<Map<String, int>> _calculateStatBonusesFromTasks(int totalPoints, int fromLevel, int toLevel) async {
+    final relevantTasks =await TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
+
+    if (relevantTasks.isEmpty) {
+      return {
+        'strength': (totalPoints * 0.2).round(),
+        'agility': (totalPoints * 0.2).round(),
+        'endurance': (totalPoints * 0.2).round(),
+        'vitality': (totalPoints * 0.2).round(),
+        'intelligence': (totalPoints * 0.2).round(),
+      };
+    }
+
+    final taskTypeCounts = <String, int>{
+      'Strength': 0,
+      'Agility': 0,
+      'Endurance': 0,
+      'Vitality': 0,
+      'Intelligence': 0,
+    };
+
+    for (final task in relevantTasks) {
+      final normalized = _normalizeTaskType(task.taskType);
+      if (taskTypeCounts.containsKey(normalized)) {
+        taskTypeCounts[normalized] = taskTypeCounts[normalized]! + 1;
+      }
+    }
+
+    return _distributePointsByTaskShare(
+      taskTypeCounts: taskTypeCounts,
+      totalPoints: totalPoints,
+    );
   }
 
   int getXPRequiredForLevel(int level) {
     if (level == 1) return 100;
-    
-    // Solo Leveling style: Different growth rates for different Hunter tiers
     double growthRate = _getHunterGrowthRate(level);
     int baseExp = 100;
-    
     return (baseExp * pow(growthRate, level - 1)).round();
   }
-  
+
   double _getHunterGrowthRate(int level) {
-    if (level >= 150) return 1.15; // National Level Hunter (insane requirements)
-    if (level >= 90) return 1.12;  // S-Rank Hunter (very hard)
-    if (level >= 75) return 1.10;  // A-Rank Hunter (hard)
-    if (level >= 50) return 1.08;  // B-Rank Hunter (moderate)
-    if (level >= 25) return 1.07;  // C-Rank Hunter
-    return 1.06; // D-E Rank Hunter (easier for beginners)
-  }
-  
-  // SOLUTION 5: Hunter Rank System
-  String _calculateHunterRank(int ?totalStats) {
-//List<String> classes = ["E-class", "D-class", "C-class", "B-class", "A-class", "S-class",];
-int totalPossible = 600; // Total possible stats for a Hunter
-    if (totalStats == null) return "E-class"; // Default to E-class if no stats
-    if (totalStats> totalPossible) return "God Mode";
-    if (totalStats> (0.9*totalPossible)) return "S-class";
-    if (totalStats> (0.75*totalPossible)) return "A-class";
-    if (totalStats> (0.65*totalPossible)) return "B-class";
-    if (totalStats> (0.55*totalPossible)) return "C-class ";
-    if (totalStats> (0.4*totalPossible)) return "D-class";
-    return "E-class"; 
+    if (level >= 150) return 1.15;
+    if (level >= 90) return 1.12;
+    if (level >= 75) return 1.10;
+    if (level >= 50) return 1.08;
+    if (level >= 25) return 1.07;
+    return 1.06;
   }
 
-   double getXPProgress() {
+  String _calculateHunterRank(int? totalStats) {
+    int totalPossible = 600;
+    if (totalStats == null) return "E-class";
+    if (totalStats > totalPossible) return "God Mode";
+    if (totalStats > (0.9 * totalPossible)) return "S-class";
+    if (totalStats > (0.75 * totalPossible)) return "A-class";
+    if (totalStats > (0.65 * totalPossible)) return "B-class";
+    if (totalStats > (0.55 * totalPossible)) return "C-class";
+    if (totalStats > (0.4 * totalPossible)) return "D-class";
+    return "E-class";
+  }
+
+  double getXPProgress() {
     if (_totalExp == 0) return 0.0;
     return _baseExp / _totalExp;
   }
-  
+
   int getXPNeededForNextLevel() {
     return _totalExp - _baseExp;
   }
-  
+
   int getTotalXPEarned() {
     int totalXP = _baseExp;
     for (int i = 1; i < baselevel; i++) {
@@ -664,17 +766,22 @@ int totalPossible = 600; // Total possible stats for a Hunter
     }
     return totalXP;
   }
-  
+
+  @override
+  void dispose() {
+    _xpProcessingTimer?.cancel();
+    _computationIsolate?.kill(priority: Isolate.immediate);
+    _isolateReceivePort?.close();
+    super.dispose();
+  }
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // Cancel any pending processing
     _xpProcessingTimer?.cancel();
+    _computationIsolate?.kill(priority: Isolate.immediate);
+    _isolateReceivePort?.close();
     
-    // Clear all data
     await prefs.clear();
-    
-    // Reset to default values
     uname = "Fragment of Light";
     _baseExp = 0;
     baselevel = 1;
@@ -683,10 +790,11 @@ int totalPossible = 600; // Total possible stats for a Hunter
     _completedTasks = 0;
     _pendingXPRewards.clear();
     _isProcessingXP = false;
+    _cachedStats = null;
+    _lastStatsCacheTime = null;
     
     notifyListeners();
   }
-
 }
 
 
