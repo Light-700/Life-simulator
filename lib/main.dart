@@ -299,7 +299,7 @@ class ProfileNotifier extends ChangeNotifier {
     int fromLevel,
     int toLevel,
   ) async {
-    final relevantTasks =await TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
+    final relevantTasks = TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
     
     if (relevantTasks.isEmpty) {
       return {
@@ -588,34 +588,37 @@ class ProfileNotifier extends ChangeNotifier {
     await Future.wait(futures);
   }
 
-  // Background stat calculation method
   Future<Map<String, int>> _calculateStatBonusesInBackground(
     int totalPoints,
     int fromLevel,
     int toLevel,
   ) async {
     final completer = Completer<Map<String, int>>();
-    
-    if (_isolateReceivePort != null) {
-      final subscription = _isolateReceivePort!.listen((message) {
-        if (message is Map<String, dynamic> && message['type'] == 'statsResult') {
-          completer.complete(message['result'] as Map<String, int>);
-        }
-      });
+    try {
+      if (_isolateReceivePort != null) {
+        final subscription = _isolateReceivePort!.listen((message) {
+          if (message is Map<String, dynamic> && message['type'] == 'statsResult') {
+            completer.complete(message['result'] as Map<String, int>);
+          }
+        });
 
-      _isolateReceivePort!.sendPort.send({
-        'type': 'calculateStats',
-        'totalPoints': totalPoints,
-        'fromLevel': fromLevel,
-        'toLevel': toLevel,
-      });
+        _isolateReceivePort!.sendPort.send({
+          'type': 'calculateStats',
+          'totalPoints': totalPoints,
+          'fromLevel': fromLevel,
+          'toLevel': toLevel,
+        });
 
-      final result = await completer.future;
-      await subscription.cancel();
-      return result;
+        final result = await completer.future;
+        await subscription.cancel();
+        return result;
+      }
+      
+      // fall back to calculating in the main isolate
+      return _calculateStatBonusesFromTasks(totalPoints, fromLevel, toLevel);
+    } catch(e) {
+      return _calculateStatBonusesFromTasks(totalPoints, fromLevel, toLevel);
     }
-
-    return _calculateStatBonusesFromTasks(totalPoints, fromLevel, toLevel);
   }
 
   static String _normalizeTaskType(String taskType) {
@@ -646,7 +649,7 @@ class ProfileNotifier extends ChangeNotifier {
     }
   }
 
-  static Map<String, int> _distributePointsByTaskShare({
+static Map<String, int> _distributePointsByTaskShare({
     required Map<String, int> taskTypeCounts,
     required int totalPoints,
   }) {
@@ -688,39 +691,11 @@ class ProfileNotifier extends ChangeNotifier {
     return result;
   }
 
-  Future<Map<String, int>> _calculateStatBonusesFromTasks(int totalPoints, int fromLevel, int toLevel) async {
-    final relevantTasks =await TaskDatabase.getTasksBetweenLevels(fromLevel, toLevel);
-
-    if (relevantTasks.isEmpty) {
-      return {
-        'strength': (totalPoints * 0.2).round(),
-        'agility': (totalPoints * 0.2).round(),
-        'endurance': (totalPoints * 0.2).round(),
-        'vitality': (totalPoints * 0.2).round(),
-        'intelligence': (totalPoints * 0.2).round(),
-      };
-    }
-
-    final taskTypeCounts = <String, int>{
-      'Strength': 0,
-      'Agility': 0,
-      'Endurance': 0,
-      'Vitality': 0,
-      'Intelligence': 0,
-    };
-
-    for (final task in relevantTasks) {
-      final normalized = _normalizeTaskType(task.taskType);
-      if (taskTypeCounts.containsKey(normalized)) {
-        taskTypeCounts[normalized] = taskTypeCounts[normalized]! + 1;
-      }
-    }
-
-    return _distributePointsByTaskShare(
-      taskTypeCounts: taskTypeCounts,
-      totalPoints: totalPoints,
-    );
+ Map<String, int> _calculateStatBonusesFromTasks(int totalPoints, int fromLevel, int toLevel) {
+    // Using the optimized cached calculation instead of expensive queries
+    return TaskDatabase.calculateStatsWithCache(totalPoints, fromLevel, toLevel);
   }
+
 
   int getXPRequiredForLevel(int level) {
     if (level == 1) return 100;
@@ -765,6 +740,24 @@ class ProfileNotifier extends ChangeNotifier {
       totalXP += getXPRequiredForLevel(i);
     }
     return totalXP;
+  }
+
+ Future<Map<String, int>> getTaskTypeStats() async {
+    return {
+      'Strength': TaskDatabase.getTaskTypeCountFast('strength'),
+      'Agility': TaskDatabase.getTaskTypeCountFast('agility'),
+      'Endurance': TaskDatabase.getTaskTypeCountFast('endurance'),
+      'Vitality': TaskDatabase.getTaskTypeCountFast('vitality'),
+      'Intelligence': TaskDatabase.getTaskTypeCountFast('intelligence'),
+    };
+  }
+
+  void optimizeMemory() {
+    TaskDatabase.optimizeMemory();
+  }
+
+  Map<String, dynamic> getMemoryStats() {
+    return TaskDatabase.getMemoryUsage();
   }
 
   @override

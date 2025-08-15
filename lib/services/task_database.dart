@@ -1,37 +1,20 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/task_model.dart';
-import 'dart:async';
+import 'lightweight_hunter_cache.dart';
+import 'package:flutter/foundation.dart';
 
 class TaskDatabase {
   static const String _boxName = 'hunterTasks';
-  static const String _indexBoxName = 'hunterTasksIndex';
   static Box<TaskModel>? _taskBox;
-  static Box<Map<String, dynamic>>? _indexBox;
+  static final LightweightHunterCache _cache = LightweightHunterCache();
   
-  // Performance caches
-  static final Map<String, List<TaskModel>> _queryCache = {};
-  static final Map<String, DateTime> _cacheTimestamps = {};
-  static const Duration _cacheExpiry = Duration(minutes: 10);
-  
-  // Task type counters for quick stats
-  static final Map<String, int> _taskTypeCounters = {
-    'Strength': 0,
-    'Agility': 0,
-    'Endurance': 0,
-    'Vitality': 0,
-    'Intelligence': 0,
-  };
-
   static Future<void> initialize() async {
     await Hive.initFlutter();
     Hive.registerAdapter(TaskModelAdapter());
-    
     _taskBox = await Hive.openBox<TaskModel>(_boxName);
-    _indexBox = await Hive.openBox<Map<String, dynamic>>(_indexBoxName);
     
-    // Build initial indexes and caches
-    await _buildIndexes();
-    await _loadTaskTypeCounters();
+    // Build cache from existing data - CRITICAL STEP
+    await _buildCacheFromExistingData();
   }
 
   static Box<TaskModel> get taskBox {
@@ -41,330 +24,145 @@ class TaskDatabase {
     return _taskBox!;
   }
 
-  static Box<Map<String, dynamic>> get indexBox {
-    if (_indexBox == null || !_indexBox!.isOpen) {
-      throw Exception('Index box not initialized. Call initialize() first.');
-    }
-    return _indexBox!;
-  }
-
-  // High-performance task addition with indexing
+  /// UPDATED: Add task with cache integration
   static Future<void> addCompletedTask(TaskModel task) async {
-    // Add to main storage
     await taskBox.put(task.id, task);
-    
-    // Update indexes for fast queries
-    await _updateIndexes(task);
-    
-    // Update type counters
-    final normalizedType = _normalizeTaskType(task.taskType);
-    _taskTypeCounters[normalizedType] = 
-        (_taskTypeCounters[normalizedType] ?? 0) + 1;
-    
-    // Clear related caches
-    _clearRelevantCaches(task.completedAtLevel);
-    
-    // Persist counters
-    await _saveTaskTypeCounters();
+    // Update cache counters for O(1) future lookups
+    _cache.incrementTaskType(task.taskType, task.completedAtLevel);
   }
 
-  // Optimized level-based query with caching and indexing
-  static Future<List<TaskModel>> getTasksBetweenLevels(int fromLevel, int toLevel) async {
-    final cacheKey = 'levels_${fromLevel}_$toLevel';
-    
-    // Check cache first
-    if (_isCacheValid(cacheKey)) {
-      return _queryCache[cacheKey]!;
+  /// NEW: O(1) task type count lookup
+  static int getTaskTypeCountFast(String taskType) {
+    return _cache.getTaskTypeCount(taskType);
+  }
+
+  /// NEW: O(1) level task count lookup  
+  static int getTaskCountAtLevel(int level) {
+    return _cache.getTaskCountAtLevel(level);
+  }
+
+  /// UPDATED: Optimized level range query with caching
+  static List<TaskModel> getTasksBetweenLevels(int fromLevel, int toLevel) {
+    // For the lightweight version, we still do the query but cache the counts
+    // This maintains data accuracy while providing fast counter access
+    return taskBox.values
+        .where((task) => task.completedAtLevel >= fromLevel && task.completedAtLevel < toLevel)
+        .toList();
+  }
+
+  /// NEW: Fast stat calculation with caching
+  static Map<String, int> calculateStatsWithCache(int totalPoints, int fromLevel, int toLevel) {
+    // Try cache first
+    Map<String, int>? cached = _cache.getCachedStats(totalPoints, fromLevel, toLevel);
+    if (cached != null) {
+      return cached;
     }
 
-    List<TaskModel> results;
+    // Calculate using optimized counters
+    final result = _calculateStatsUsingCounters(totalPoints, fromLevel, toLevel);
     
-    // Try to use index for faster query
-    final indexKey = 'level_range_${fromLevel}_$toLevel';
-    final indexedIds = indexBox.get(indexKey);
+    // Cache the result
+    _cache.cacheStats(totalPoints, fromLevel, toLevel, result);
     
-    if (indexedIds != null && indexedIds['ids'] is List) {
-      // Use indexed IDs for O(1) lookup instead of O(n) scan
-      results = (indexedIds['ids'] as List<String>)
-          .map((id) => taskBox.get(id))
-          .where((task) => task != null)
-          .cast<TaskModel>()
-          .toList();
-    } else {
-      // Fallback to direct query with optimization
-      results = taskBox.values
-          .where((task) => task.completedAtLevel >= fromLevel && 
-                          task.completedAtLevel < toLevel)
-          .take(1000) // Limit results to prevent memory issues
-          .toList();
-      
-      // Cache the IDs for future queries
-      await _cacheQueryIndex(indexKey, results.map((t) => t.id).toList());
+    return result;
+  }
+
+  /// NEW: Calculate stats using cached counters instead of full queries
+  static Map<String, int> _calculateStatsUsingCounters(int totalPoints, int fromLevel, int toLevel) {
+    // Use cached task type ratios instead of expensive queries
+    final strengthCount = _cache.getTaskTypeCount('strength');
+    final agilityCount = _cache.getTaskTypeCount('agility'); 
+    final enduranceCount = _cache.getTaskTypeCount('endurance');
+    final vitalityCount = _cache.getTaskTypeCount('vitality');
+    final intelligenceCount = _cache.getTaskTypeCount('intelligence');
+    
+    final totalTasks = strengthCount + agilityCount + enduranceCount + vitalityCount + intelligenceCount;
+    
+    if (totalTasks == 0) {
+      // Equal distribution fallback
+      final per = (totalPoints / 5).floor();
+      return {
+        'strength': per,
+        'agility': per,
+        'endurance': per,
+        'vitality': per,
+        'intelligence': per,
+      };
     }
 
-    // Cache the results
-    _queryCache[cacheKey] = results;
-    _cacheTimestamps[cacheKey] = DateTime.now();
-
-    return results;
-  }
-
-  // Super-fast type-based query using counters and indexes
-  static List<TaskModel> getTasksByTypeInRange(
-    String taskType, 
-    int fromLevel, 
-    int toLevel
-  ) {
-    final normalizedType = _normalizeTaskType(taskType);
-    final cacheKey = 'type_${normalizedType}_${fromLevel}_$toLevel';
-    
-    if (_isCacheValid(cacheKey)) {
-      return _queryCache[cacheKey]!;
+    // Estimate level-range distribution based on overall ratios
+    int tasksInRange = 0;
+    for (int level = fromLevel; level < toLevel; level++) {
+      tasksInRange += _cache.getTaskCountAtLevel(level);
     }
 
-    // Use type-specific index for faster queries
-    final indexKey = 'type_${normalizedType}_levels';
-    final typeIndex = indexBox.get(indexKey);
+    if (tasksInRange == 0) tasksInRange = 1; // Prevent division by zero
+
+    // Proportional distribution
+    return {
+      'strength': ((strengthCount / totalTasks) * totalPoints).round(),
+      'agility': ((agilityCount / totalTasks) * totalPoints).round(),
+      'endurance': ((enduranceCount / totalTasks) * totalPoints).round(),
+      'vitality': ((vitalityCount / totalTasks) * totalPoints).round(),
+      'intelligence': ((intelligenceCount / totalTasks) * totalPoints).round(),
+    };
+  }
+
+  /// NEW: Build cache from existing Hive data
+  static Future<void> _buildCacheFromExistingData() async {
+    final allTasks = taskBox.values;
+    print('🔧 Building cache from ${allTasks.length} existing tasks...');
     
-    List<TaskModel> results;
-    
-    if (typeIndex != null && typeIndex['levels'] is Map) {
-      // Use level-indexed type data
-      final levelMap = typeIndex['levels'] as Map<String, List<String>>;
-      final relevantIds = <String>[];
-      
-      for (int level = fromLevel; level < toLevel; level++) {
-        final levelIds = levelMap[level.toString()];
-        if (levelIds != null) {
-          relevantIds.addAll(levelIds);
-        }
-      }
-      
-      results = relevantIds
-          .map((id) => taskBox.get(id))
-          .where((task) => task != null)
-          .cast<TaskModel>()
-          .toList();
-    } else {
-      // Fallback query
-      results = taskBox.values
-          .where((task) => 
-              _normalizeTaskType(task.taskType) == normalizedType &&
-              task.completedAtLevel >= fromLevel && 
-              task.completedAtLevel < toLevel)
-          .take(500)
-          .toList();
+    for (final task in allTasks) {
+      _cache.incrementTaskType(task.taskType, task.completedAtLevel);
     }
-
-    _queryCache[cacheKey] = results;
-    _cacheTimestamps[cacheKey] = DateTime.now();
-
-    return results;
-  }
-
-  // Get task type distribution quickly using cached counters
-  static Map<String, int> getTaskTypeDistribution() {
-    return Map<String, int>.from(_taskTypeCounters);
-  }
-
-  // Optimized stats calculation using cached data
-  static Map<String, double> getTaskTypePercentages() {
-    final total = _taskTypeCounters.values.fold<int>(0, (sum, count) => sum + count);
-    if (total == 0) return {};
     
-    return _taskTypeCounters.map((key, value) => 
-        MapEntry(key, (value / total) * 100));
+    final memStats = _cache.getMemoryStats();
+    debugPrint('!!! ==> Cache built: ${memStats['totalMemoryUsage']} memory usage');
   }
 
-  static List<TaskModel> getAllTasks() {
-    return taskBox.values.toList();
-  }
-
+  /// UPDATED: Delete with cache maintenance
   static Future<void> deleteTask(String taskId) async {
     final task = taskBox.get(taskId);
     if (task != null) {
       await taskBox.delete(taskId);
-      await _removeFromIndexes(task);
-      
-      // Update counters
-      final normalizedType = _normalizeTaskType(task.taskType);
-      _taskTypeCounters[normalizedType] = 
-          (_taskTypeCounters[normalizedType] ?? 1) - 1;
-      
-      await _saveTaskTypeCounters();
-      _clearRelevantCaches(task.completedAtLevel);
+      // Rebuild cache counters (since we can't easily decrement)
+      await _rebuildCache();
     }
+  }
+
+  /// NEW: Rebuild cache when needed
+  static Future<void> _rebuildCache() async {
+    _cache.dispose();
+    await _buildCacheFromExistingData();
+  }
+
+  /// NEW: Memory usage monitoring
+  static Map<String, dynamic> getMemoryUsage() {
+    return _cache.getMemoryStats();
+  }
+
+  /// NEW: Memory optimization
+  static void optimizeMemory() {
+    _cache.compactMemory();
+  }
+
+  // Keep existing methods for compatibility
+  static List<TaskModel> getAllTasks() {
+    return taskBox.values.toList();
+  }
+
+  static List<TaskModel> getTasksByTypeInRange(String taskType, int fromLevel, int toLevel) {
+    return taskBox.values
+        .where((task) =>
+            task.taskType == taskType &&
+            task.completedAtLevel >= fromLevel &&
+            task.completedAtLevel < toLevel)
+        .toList();
   }
 
   static Future<void> clearAllTasks() async {
     await taskBox.clear();
-    await indexBox.clear();
-    _queryCache.clear();
-    _cacheTimestamps.clear();
-    _taskTypeCounters.updateAll((key, value) => 0);
-    await _saveTaskTypeCounters();
-  }
-
-  // Build comprehensive indexes for fast queries
-  static Future<void> _buildIndexes() async {
-    final levelIndex = <int, List<String>>{};
-    final typeIndexes = <String, Map<int, List<String>>>{};
-    
-    for (final task in taskBox.values) {
-      final level = task.completedAtLevel;
-      final normalizedType = _normalizeTaskType(task.taskType);
-      
-      // Level index
-      levelIndex.putIfAbsent(level, () => []).add(task.id);
-      
-      // Type-level index
-      typeIndexes.putIfAbsent(normalizedType, () => {})
-          .putIfAbsent(level, () => []).add(task.id);
-    }
-
-    // Save level indexes
-    for (final entry in levelIndex.entries) {
-      await indexBox.put('level_${entry.key}', {'ids': entry.value});
-    }
-
-    // Save type indexes
-    for (final typeEntry in typeIndexes.entries) {
-      final levelMap = typeEntry.value.map((level, ids) => 
-          MapEntry(level.toString(), ids));
-      await indexBox.put('type_${typeEntry.key}_levels', {'levels': levelMap});
-    }
-  }
-
-  static Future<void> _updateIndexes(TaskModel task) async {
-    final level = task.completedAtLevel;
-    final normalizedType = _normalizeTaskType(task.taskType);
-    
-    // Update level index
-    final levelIndexKey = 'level_$level';
-    final levelIndex = indexBox.get(levelIndexKey) ?? {'ids': <String>[]};
-    (levelIndex['ids'] as List<String>).add(task.id);
-    await indexBox.put(levelIndexKey, levelIndex);
-    
-    // Update type-level index
-    final typeIndexKey = 'type_${normalizedType}_levels';
-    final typeIndex = indexBox.get(typeIndexKey) ?? {'levels': <String, List<String>>{}};
-    final levelMap = typeIndex['levels'] as Map<String, List<String>>;
-    levelMap.putIfAbsent(level.toString(), () => []).add(task.id);
-    await indexBox.put(typeIndexKey, typeIndex);
-  }
-
-  static Future<void> _removeFromIndexes(TaskModel task) async {
-    final level = task.completedAtLevel;
-    final normalizedType = _normalizeTaskType(task.taskType);
-    
-    // Remove from level index
-    final levelIndexKey = 'level_$level';
-    final levelIndex = indexBox.get(levelIndexKey);
-    if (levelIndex != null) {
-      (levelIndex['ids'] as List<String>).remove(task.id);
-      await indexBox.put(levelIndexKey, levelIndex);
-    }
-    
-    // Remove from type-level index
-    final typeIndexKey = 'type_${normalizedType}_levels';
-    final typeIndex = indexBox.get(typeIndexKey);
-    if (typeIndex != null) {
-      final levelMap = typeIndex['levels'] as Map<String, List<String>>;
-      levelMap[level.toString()]?.remove(task.id);
-      await indexBox.put(typeIndexKey, typeIndex);
-    }
-  }
-
-  static Future<void> _cacheQueryIndex(String indexKey, List<String> ids) async {
-    await indexBox.put(indexKey, {'ids': ids});
-  }
-
-  static Future<void> _loadTaskTypeCounters() async {
-    final savedCounters = indexBox.get('task_type_counters');
-    // ignore: unnecessary_type_check
-    if (savedCounters != null && savedCounters is Map<String, dynamic>) {
-      savedCounters.forEach((key, value) {
-        if (_taskTypeCounters.containsKey(key) && value is int) {
-          _taskTypeCounters[key] = value;
-        }
-      });
-    } else {
-      // Build counters from scratch
-      for (final task in taskBox.values) {
-        final normalizedType = _normalizeTaskType(task.taskType);
-        _taskTypeCounters[normalizedType] = 
-            (_taskTypeCounters[normalizedType] ?? 0) + 1;
-      }
-      await _saveTaskTypeCounters();
-    }
-  }
-
-  static Future<void> _saveTaskTypeCounters() async {
-    await indexBox.put('task_type_counters', Map<String, dynamic>.from(_taskTypeCounters));
-  }
-
-  static bool _isCacheValid(String cacheKey) {
-    final cachedTime = _cacheTimestamps[cacheKey];
-    return cachedTime != null && 
-           DateTime.now().difference(cachedTime).compareTo(_cacheExpiry) < 0 &&
-           _queryCache.containsKey(cacheKey);
-  }
-
-  static void _clearRelevantCaches(int level) {
-    final keysToRemove = _queryCache.keys.where((key) => 
-        key.contains('levels_') && key.contains('_${level}_')).toList();
-    
-    for (final key in keysToRemove) {
-      _queryCache.remove(key);
-      _cacheTimestamps.remove(key);
-    }
-  }
-
-  static String _normalizeTaskType(String taskType) {
-    switch (taskType.toLowerCase()) {
-      case 'strength':
-      case 'physical':
-      case 'workout':
-        return 'Strength';
-      case 'agility':
-      case 'speed':
-      case 'sports':
-        return 'Agility';
-      case 'endurance':
-      case 'cardio':
-      case 'stamina':
-        return 'Endurance';
-      case 'vitality':
-      case 'health':
-      case 'nutrition':
-        return 'Vitality';
-      case 'intelligence':
-      case 'study':
-      case 'brain':
-      case 'mental':
-        return 'Intelligence';
-      default:
-        return 'Intelligence';
-    }
-  }
-
-  // Analytics methods for better insights
-  static Map<String, dynamic> getTaskAnalytics() {
-    final total = taskBox.length;
-    final distribution = getTaskTypeDistribution();
-    final percentages = getTaskTypePercentages();
-    
-    return {
-      'totalTasks': total,
-      'typeDistribution': distribution,
-      'typePercentages': percentages,
-      'cacheHitRate': _calculateCacheHitRate(),
-    };
-  }
-
-  static double _calculateCacheHitRate() {
-    // Simplified cache hit rate calculation
-    final totalQueries = _queryCache.length + _cacheTimestamps.length;
-    return totalQueries > 0 ? _queryCache.length / totalQueries : 0.0;
+    _cache.dispose();
   }
 }

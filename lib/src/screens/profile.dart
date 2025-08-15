@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../main.dart';
+import '/services/task_database.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   final void Function(int) navigator;
 
   
@@ -13,6 +14,11 @@ class ProfilePage extends StatelessWidget {
     required this.navigator,
   }); 
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   @override
 
   Widget build(BuildContext context) { 
@@ -41,7 +47,7 @@ class ProfilePage extends StatelessWidget {
                     Row(
                       children: [
                         OutlinedButton(
-                          onPressed: () => navigator(0),
+                          onPressed: () => widget.navigator(0),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color.fromARGB(255, 238, 179, 18),
                             side: const BorderSide(color: Color.fromARGB(255, 238, 179, 18)),
@@ -366,12 +372,65 @@ class ProfilePage extends StatelessWidget {
                                 _buildStat("Tasks", "0"),
                                 _buildStat("Points", "0"),
                                 _buildStat("Streak", "0"),
+                                /* need to implement the above three lines properly */
                               ],
                             ),
                           ],
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 16),
+Card(
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(8),
+    side: const BorderSide(
+      color: Color.fromARGB(255, 238, 179, 18),
+      width: 2,
+    ),
+  ),
+  color: const Color.fromARGB(255, 37, 29, 29),
+  child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      children: [
+        const Text(
+          "System Performance",
+          style: TextStyle(
+            color: Color.fromARGB(255, 18, 187, 238),
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        FutureBuilder<Map<String, dynamic>>(
+          future: Future.value(TaskDatabase.getMemoryUsage()),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final stats = snapshot.data!;
+              return Column(
+                children: [
+                  _buildStat("Memory", stats['totalMemoryUsage']),
+                  _buildStat("Cache Efficiency", stats['memoryEfficiency']),
+                  if (stats['estimatedBytes'] > 10240)
+                    ElevatedButton(
+                      onPressed: () {
+                        TaskDatabase.optimizeMemory();
+                        // Trigger rebuild
+                        setState(() {});
+                      },
+                      child: const Text('Optimize'),
+                    ),
+                ],
+              );
+            }
+            return const CircularProgressIndicator();
+          },
+        ),
+      ],
+    ),
+  ),
+),
                   ],
                 ),
               ),
