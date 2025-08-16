@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import 'dart:math' as math; 
 import '../../main.dart';
 
@@ -46,6 +47,21 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
   ];
 
 String _class ='S-class';
+
+ Timer? _debounceTimer;
+  
+  void _handleTextChange() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(Duration(milliseconds: 300), () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
 
   Map<String, int> _calculateGameStats() {
     double weight = double.tryParse(_weightController.text) ?? 0;
@@ -515,7 +531,7 @@ String _class ='S-class';
       style: const TextStyle(color: Colors.white),
       keyboardType: keyboardType,
       validator: validator,
-      onChanged: (value) => setState(() {}),
+      onChanged: (value) => _handleTextChange(),
     );
   }
 

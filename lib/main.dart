@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
 import 'dart:isolate';
+import 'services/progression_analytics_hive.dart';
+import 'package:hive_flutter/hive_flutter.dart'; 
+// ignore: unnecessary_import
+import 'package:flutter/foundation.dart';
 
 import 'package:provider/provider.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/rendering.dart';
 
 import 'src/screens/achievements.dart';
 import 'src/screens/profile.dart';
@@ -14,11 +19,15 @@ import 'src/screens/extended_login.dart';
 import 'services/task_database.dart';
 import 'models/task_model.dart';
 import 'services/notification_service.dart';
+import 'services/progression_analytics_hive.dart';
+
 
 Future<void> main() async { 
+  debugRepaintRainbowEnabled = true;
   WidgetsFlutterBinding.ensureInitialized();
-  await TaskDatabase.initialize();
 
+  await TaskDatabase.initialize();
+  await ProgressionAnalyticsHive.init();
   await NotificationService().initialize();
   
   // Check if user is logged in and profile is completed
@@ -253,9 +262,12 @@ class ProfileNotifier extends ChangeNotifier {
   ReceivePort? _isolateReceivePort;
 
   ProfileNotifier() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
     _loadUserData();
     _initializeBackgroundComputation();
   }
+  );
+}
 
   String get username => uname;
   int get xp => _baseExp;
@@ -333,31 +345,40 @@ class ProfileNotifier extends ChangeNotifier {
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+try{    final prefs = await SharedPreferences.getInstance();
     
     // Batch load all data at once for better performance
-    final futures = <Future<dynamic>>[
-  Future.value(prefs.getString(usernameKey)),
-  Future.value(prefs.getInt(expKey)),
-  Future.value(prefs.getInt(levelKey)),
-  Future.value(prefs.getInt(totExpKey)),
-  Future.value(prefs.getString(hunterClassKey)),
-  Future.value(prefs.getInt(completedTasksKey)),
-  Future.value(prefs.getInt('totalStats')),
-];
+  final userData = await Future.wait([
+      Future.microtask(() => prefs.getString(usernameKey)),
+      Future.microtask(() => prefs.getInt(expKey)),
+      Future.microtask(() => prefs.getInt(levelKey)),
+      Future.microtask(() => prefs.getInt(totExpKey)),
+      Future.microtask(() => prefs.getString(hunterClassKey)),
+      Future.microtask(() => prefs.getInt(completedTasksKey)),
+      Future.microtask(() => prefs.getInt('totalStats')),
+    ]);
 
-    final results = await Future.wait(futures);
     
-    if (results[0] != null) uname = results[0] as String;
-    if (results[1] != null) _baseExp = results[1] as int;
-    if (results[5] != null) _completedTasks = results[5] as int;
-    if (results[4] != null) hunterClass = results[4] as String;
-    if (results[2] != null) {
-      baselevel = results[2] as int;
+    if (userData[0] != null) uname = userData[0] as String;
+    if (userData[1] != null) _baseExp = userData[1] as int;
+    if (userData[5] != null) _completedTasks = userData[5] as int;
+    if (userData[4] != null) hunterClass = userData[4] as String;
+    if (userData[2] != null) {
+      baselevel = userData[2] as int;
       _totalExp = getXPRequiredForLevel(baselevel);
-      hunterClass = _calculateHunterRank(results[6] as int?);
+      hunterClass = _calculateHunterRank(userData[6] as int?);
     }
     notifyListeners();
+    }
+    catch(e){
+      print("Error loading user data: $e");
+      uname = "Fragment of Light";
+      _baseExp = 1;
+      baselevel = 1;
+      _totalExp = getXPRequiredForLevel(baselevel);
+      hunterClass = "E-class";
+      _completedTasks = 0;
+    }
   }
 
   Future<void> updateName(String newuname) async {
@@ -427,6 +448,8 @@ class ProfileNotifier extends ChangeNotifier {
         taskTypeXP[taskType] = (taskTypeXP[taskType] ?? 0) + (reward['exp'] as int);
       }
 
+fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGain');
+
       // Show notification usin unawaited
       unawaited(NotificationService().showBatchCompletionNotification(
         completedTasks, 
@@ -442,6 +465,13 @@ class ProfileNotifier extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void fireAndForget(Future<void> future, {String? tag}) {
+  //unhandled exceptions crashing zones
+  future.catchError((e, st) {
+     debugPrint('[${tag ?? 'bg'}] $e\n$st');
+  });
+}
 
   // Optimized progression processing with background computation
   Future<void> _processHunterProgression(int totalCurrentXP) async {
@@ -547,6 +577,16 @@ class ProfileNotifier extends ChangeNotifier {
       'vitalityStat': currentStats['vitalityStat']! + (bonuses['vitality'] ?? 0),
       'intelligenceStat': currentStats['intelligenceStat']! + (bonuses['intelligence'] ?? 0),
     };
+
+    final statDelta = <String, int>{
+  'strength': (bonuses['strength'] ?? 0),
+  'agility': (bonuses['agility'] ?? 0),
+  'endurance': (bonuses['endurance'] ?? 0),
+  'vitality': (bonuses['vitality'] ?? 0),
+  'intelligence': (bonuses['intelligence'] ?? 0),
+};
+
+    fireAndForget(ProgressionAnalyticsHive.recordStatDelta(statDelta), tag: 'recordStatDelta');
 
     final writeFutures = <Future<bool>>[];
     for (final entry in newStats.entries) {
@@ -901,12 +941,14 @@ class RealHome extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 70, bottom: 15, left: 10, right:10),
-              child: LinearProgressIndicator(
-                value: Provider.of<ProfileNotifier>(context).getXPProgress(),
-                minHeight: 15,
-                borderRadius: BorderRadius.circular(10),
-                color: const Color.fromARGB(255, 238, 33, 18),
-                backgroundColor: const Color.fromARGB(131, 54, 14, 14),
+              child: RepaintBoundary(
+                child: LinearProgressIndicator(
+                  value: Provider.of<ProfileNotifier>(context).getXPProgress(),
+                  minHeight: 15,
+                  borderRadius: BorderRadius.circular(10),
+                  color: const Color.fromARGB(255, 238, 33, 18),
+                  backgroundColor: const Color.fromARGB(131, 54, 14, 14),
+                ),
               ),
             ),
             SizedBox(
