@@ -3,7 +3,8 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:isolate';
 import 'services/progression_analytics_hive.dart';
-import 'package:hive_flutter/hive_flutter.dart'; 
+import '/models/daily_progress.dart';
+import 'package:intl/intl.dart';
 // ignore: unnecessary_import
 import 'package:flutter/foundation.dart';
 
@@ -19,7 +20,6 @@ import 'src/screens/extended_login.dart';
 import 'services/task_database.dart';
 import 'models/task_model.dart';
 import 'services/notification_service.dart';
-import 'services/progression_analytics_hive.dart';
 
 
 Future<void> main() async { 
@@ -37,18 +37,30 @@ Future<void> main() async {
   final username = prefs.getString('username') ?? '';
   
   runApp(
-    ChangeNotifierProvider(
-      create: (context) {
-        final notifier = ProfileNotifier();
-        if (isLoggedIn && username.isNotEmpty) {
-          notifier.updateName(username);
-        }
-        return notifier;
-      },
-      child: MyApp(
-        isLoggedIn: isLoggedIn, 
-        profileCompleted: profileCompleted
-      ),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) {
+            final notifier = ProfileNotifier();
+            if (isLoggedIn && username.isNotEmpty) {
+              notifier.updateName(username);
+            }
+            return notifier;
+          },
+        ),
+        ChangeNotifierProvider(create:(context) {
+            final statNotifier = StatNotifier();
+            if (isLoggedIn && profileCompleted) {
+              statNotifier.initialize();
+            }
+            return statNotifier;
+          },
+          )
+      ],
+       child: MyApp(
+            isLoggedIn: isLoggedIn, 
+            profileCompleted: profileCompleted
+          ),
     ),
   );
 }
@@ -830,6 +842,80 @@ static Map<String, int> _distributePointsByTaskShare({
   }
 }
 
+class StatNotifier extends ChangeNotifier {
+  final Map<String, int> _baseStats = {};
+  final Map<String, List<int>> _statHistory = {};
+  bool _initialized = false;
+  
+  // Initialize with base stats from SharedPreferences and calculate history from Hive
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Load base stats
+    _baseStats['strength'] = prefs.getInt('strengthStat') ?? 10;
+    _baseStats['agility'] = prefs.getInt('agilityStat') ?? 10;
+    _baseStats['endurance'] = prefs.getInt('enduranceStat') ?? 10;
+    _baseStats['vitality'] = prefs.getInt('vitalityStat') ?? 10;
+    _baseStats['intelligence'] = prefs.getInt('intelligenceStat') ?? 10;
+    
+    await _calculateStatHistory();
+    _initialized = true;
+    notifyListeners();
+  }
+  
+  Future<void> _calculateStatHistory() async {
+    final now = DateTime.now();
+    final fromDate = DateTime(now.year, now.month, now.day).subtract(Duration(days: 89)); // Max range
+    final toDate = DateTime(now.year, now.month, now.day);
+    
+    final progressData = await ProgressionAnalyticsHive.getRange(fromDate, toDate);
+    final fmt = DateFormat('yyyy-MM-dd');
+    
+    // Initialize running totals for each stat
+    final runningTotals = <String, int>{
+      for (final stat in _baseStats.keys) stat: _baseStats[stat]!,
+    };
+    
+    _statHistory.clear();
+    for (final stat in _baseStats.keys) {
+      _statHistory[stat] = [];
+    }
+    
+    // Calculate cumulative values day by day
+    for (int i = 0; i < 90; i++) {
+      final d = fromDate.add(Duration(days: i));
+      final key = fmt.format(d);
+      final dp = progressData.firstWhere(
+        (e) => e.dateKey == key,
+        orElse: () => DailyProgress(dateKey: key),
+      );
+      
+      for (final stat in _baseStats.keys) {
+        final delta = dp.statDeltas[stat] ?? 0;
+        runningTotals[stat] = runningTotals[stat]! + delta;
+        _statHistory[stat]!.add(runningTotals[stat]!);
+      }
+    }
+  }
+  
+  int getCurrentStatValue(String statName) {
+    if (!_initialized) return _baseStats[statName] ?? 10;
+    return _statHistory[statName]?.last ?? _baseStats[statName] ?? 10;
+  }
+  
+  List<int> getStatHistoryForRange(String statName, int daysRange) {
+    if (!_initialized || _statHistory[statName] == null) return [];
+    final history = _statHistory[statName]!;
+    final startIndex = history.length - daysRange;
+    return history.sublist(startIndex.clamp(0, history.length));
+  }
+  
+  // Call this when stats are updated
+  Future<void> refreshStats() async {
+    await initialize();
+  }
+}
+
 
 class MyHomePage extends StatefulWidget {
   
@@ -942,7 +1028,7 @@ class RealHome extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 70, bottom: 15, left: 10, right:10),
               child: RepaintBoundary(
-                child: LinearProgressIndicator(
+                child: LinearProgressIndicator(  
                   value: Provider.of<ProfileNotifier>(context).getXPProgress(),
                   minHeight: 15,
                   borderRadius: BorderRadius.circular(10),
