@@ -251,12 +251,15 @@ class ProfileNotifier extends ChangeNotifier {
   static const String completedTasksKey = 'completedTasks';
 
   String uname = "Fragment of Light";
-  int _baseExp = 1;
+  int _baseExp = 1; //exp that is available for levelling up
   int baselevel = 1;
-  int _totalExp = 100;
+  int _totalExp = 100; //exp required for next level
   String hunterClass = "E-class";
   int _completedTasks = 0;
   int _previousLevel = 1;
+
+int _lifetimeXPEarned = 1;
+static const String lifetimeXPKey = 'lifetimeXP';
   
   // Optimized batch processing
   List<Map<String, dynamic>> _pendingXPRewards = [];
@@ -376,7 +379,7 @@ try{    final prefs = await SharedPreferences.getInstance();
     if (userData[4] != null) hunterClass = userData[4] as String;
     if (userData[2] != null) {
       baselevel = userData[2] as int;
-      _totalExp = getXPRequiredForLevel(baselevel);
+      _totalExp = getXPRequiredForLevel(baselevel, hunterClass);
       hunterClass = _calculateHunterRank(userData[6] as int?);
     }
     notifyListeners();
@@ -386,8 +389,8 @@ try{    final prefs = await SharedPreferences.getInstance();
       uname = "Fragment of Light";
       _baseExp = 1;
       baselevel = 1;
-      _totalExp = getXPRequiredForLevel(baselevel);
-      hunterClass = "E-class";
+      _totalExp = getXPRequiredForLevel(baselevel, hunterClass);
+      hunterClass = "E-rank";
       _completedTasks = 0;
     }
   }
@@ -468,7 +471,10 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
         taskTypeXP
       ));
 
-      await _processHunterProgression(_baseExp + totalXP);
+      _lifetimeXPEarned += totalXP;
+      //final prefs = await SharedPreferences.getInstance();
+      //await prefs.setInt(lifetimeXPKey, _lifetimeXPEarned);
+      await _processHunterProgression((_baseExp + totalXP), _lifetimeXPEarned );
 
       _pendingXPRewards.clear();
     } finally {
@@ -484,8 +490,7 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
   });
 }
 
-  // Optimized progression processing with background computation
-  Future<void> _processHunterProgression(int totalCurrentXP) async {
+  Future<void> _processHunterProgression(int totalCurrentXP, int lifetimeXPEarned) async {
     final prefs = await SharedPreferences.getInstance();
     int currentLevel = baselevel;
     int remainingXP = totalCurrentXP;
@@ -493,8 +498,8 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
     final oldRank = hunterClass;
     final levelUpStartLevel = _previousLevel;
 
-    while (remainingXP >= getXPRequiredForLevel(currentLevel)) {
-      remainingXP -= getXPRequiredForLevel(currentLevel);
+    while (remainingXP >= getXPRequiredForLevel(currentLevel, hunterClass)) {
+      remainingXP -= getXPRequiredForLevel(currentLevel, hunterClass);
       currentLevel++;
       levelUps.add(currentLevel);
       
@@ -506,7 +511,7 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
 
     if (levelUps.isNotEmpty) {
       baselevel = currentLevel;
-      _totalExp = getXPRequiredForLevel(currentLevel);
+      _totalExp = getXPRequiredForLevel(currentLevel, hunterClass);
       final statPoint = levelUps.length * 5;
 
       // Using cached stats if available and recent
@@ -550,17 +555,24 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
         notificationFutures.add(
           NotificationService().showRankAdvancement(oldRank, hunterClass)
         );
+        baselevel = 1;  // Reset level to 1 after every rank change
+        _totalExp = getXPRequiredForLevel(1,hunterClass); 
+        _baseExp = 0; 
+        await _batchSaveProgressionData(prefs,1 , newTotalStats, lifetimeXPEarned);
+      }
+      else {
+        await _batchSaveProgressionData(prefs, currentLevel, newTotalStats, lifetimeXPEarned);
       }
 
       // Execute all notifications in parallel
       unawaited(Future.wait(notificationFutures));
 
-      // Batch save all progression data
-      await _batchSaveProgressionData(prefs, currentLevel, newTotalStats);
+      
     }
 
     _baseExp = remainingXP;
     await prefs.setInt(expKey, _baseExp);
+
     notifyListeners();
   }
 
@@ -627,13 +639,15 @@ fireAndForget(ProgressionAnalyticsHive.recordExpGain(totalXP), tag: 'recordExpGa
   Future<void> _batchSaveProgressionData(
     SharedPreferences prefs, 
     int currentLevel, 
-    int newTotalStats
+    int newTotalStats,
+    int lifetimeXPEarned
   ) async {
     final futures = <Future<bool>>[
       prefs.setInt(levelKey, currentLevel),
       prefs.setInt(totExpKey, _totalExp),
       prefs.setInt('totalStats', newTotalStats),
       prefs.setString(hunterClassKey, hunterClass),
+      prefs.setInt(lifetimeXPKey, lifetimeXPEarned),
     ];
 
     await Future.wait(futures);
@@ -748,32 +762,32 @@ static Map<String, int> _distributePointsByTaskShare({
   }
 
 
-  int getXPRequiredForLevel(int level) {
+  int getXPRequiredForLevel(int level, String rank) {
     if (level == 1) return 100;
-    double growthRate = _getHunterGrowthRate(level);
+    double growthRate = _getHunterGrowthRate(rank);
     int baseExp = 100;
     return (baseExp * pow(growthRate, level - 1)).round();
   }
 
-  double _getHunterGrowthRate(int level) {
-    if (level >= 150) return 1.15;
-    if (level >= 90) return 1.12;
-    if (level >= 75) return 1.10;
-    if (level >= 50) return 1.08;
-    if (level >= 25) return 1.07;
+  double _getHunterGrowthRate(String rank) {
+    if (rank == 'S-rank') return 1.15;
+    if (rank == 'A-rank') return 1.12;
+    if (rank == 'B-rank') return 1.10;
+    if (rank == 'C-rank') return 1.08;
+    if (rank == 'D-rank') return 1.07;
     return 1.06;
   }
 
   String _calculateHunterRank(int? totalStats) {
     int totalPossible = 600;
-    if (totalStats == null) return "E-class";
+    if (totalStats == null) return "E-rank";
     if (totalStats > totalPossible) return "God Mode";
-    if (totalStats > (0.9 * totalPossible)) return "S-class";
-    if (totalStats > (0.75 * totalPossible)) return "A-class";
-    if (totalStats > (0.65 * totalPossible)) return "B-class";
-    if (totalStats > (0.55 * totalPossible)) return "C-class";
-    if (totalStats > (0.4 * totalPossible)) return "D-class";
-    return "E-class";
+    if (totalStats > (0.9 * totalPossible)) return "S-rank";
+    if (totalStats > (0.75 * totalPossible)) return "A-rank";
+    if (totalStats > (0.65 * totalPossible)) return "B-rank";
+    if (totalStats > (0.55 * totalPossible)) return "C-rank";
+    if (totalStats > (0.4 * totalPossible)) return "D-rank";
+    return "E-rank";
   }
 
   double getXPProgress() {
@@ -785,12 +799,9 @@ static Map<String, int> _distributePointsByTaskShare({
     return _totalExp - _baseExp;
   }
 
-  int getTotalXPEarned() {
-    int totalXP = _baseExp;
-    for (int i = 1; i < baselevel; i++) {
-      totalXP += getXPRequiredForLevel(i);
-    }
-    return totalXP;
+  Future<int> getTotalXPEarned() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(lifetimeXPKey) ?? _lifetimeXPEarned;
   }
 
  Future<Map<String, int>> getTaskTypeStats() async {
@@ -861,6 +872,12 @@ class StatNotifier extends ChangeNotifier {
     _initialized = true;
     notifyListeners();
   }
+
+  /*StatNotifier() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      initialize();
+    });
+  }*/
   
   Future<void> _calculateStatHistory() async {
     final now = DateTime.now();

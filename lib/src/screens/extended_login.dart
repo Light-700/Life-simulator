@@ -46,7 +46,7 @@ class _ExtendedDetailsPageState extends State<ExtendedDetailsPage> {
     'Overall Development'
   ];
 
-String _class ='S-class';
+String _class ='S-rank';
 
  Timer? _debounceTimer;
   
@@ -86,22 +86,22 @@ String _class ='S-class';
     int totalPossible = 600;
 
      if(totalStats>(0.9*totalPossible)){
-      _class='S-class';
+      _class='S-rank';
      }
      else if(totalStats>(0.75*totalPossible)){
-      _class = 'A-class';
+      _class = 'A-rank';
      }
      else if(totalStats>(0.65*totalPossible)){
-      _class ='B-class';
+      _class ='B-rank';
      }
      else if(totalStats>(0.55*totalPossible)){
-      _class = 'C-class';
+      _class = 'C-rank';
      }
      else if(totalStats>(0.4*totalPossible)){
-      _class = 'D-class';
+      _class = 'D-rank';
      }
      else{
-      _class = 'E-class';
+      _class = 'E-rank';
      }
     
     return {
