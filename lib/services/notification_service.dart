@@ -81,9 +81,9 @@ class NotificationService {
 
     // Start detection timer
     _waitingForUserResponse = true;
-    _responseTimer = Timer(Duration(seconds: 10), () {
+    _responseTimer = Timer(Duration(seconds: 7), () {
       if (_waitingForUserResponse && context.mounted) {
-        // User didn't interact - likely no heads-up display
+        //dialog if no reaction is recorded
         showDialog(
           context: context,
           builder: (context) => FloatingNotificationGuide(),

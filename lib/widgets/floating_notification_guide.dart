@@ -10,31 +10,42 @@ class FloatingNotificationGuide extends StatelessWidget {
         children: [
           Icon(Icons.settings, color: Color.fromARGB(255, 238, 33, 18)),
           SizedBox(width: 8),
-          Flexible(child: Text(" Hunter System Setup", style: TextStyle(color: Colors.white), 
-          softWrap: true,
-          overflow: TextOverflow.visible),
+          Flexible(
+            child: Text(
+              "Hunter System Setup",
+              style: TextStyle(color: Colors.white),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
           ),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            "For real-time popup alerts:",
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+      content: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
           ),
-          SizedBox(height: 16),
-          _buildStep("1", "Go to Android Settings"),
-          _buildStep("2", "Tap Notifications"),  
-          _buildStep("3", "Select Advanced Settings"),
-          _buildStep("4", "Enable 'Floating Notifications'"),
-          _buildStep("5", "Find your 'Life_simulator' app and enable it"),
-          SizedBox(height: 16),
-          Text(
-            "This gives you WhatsApp-style popups for level ups!",
-            style: TextStyle(color: Colors.white60, fontSize: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "For real-time popup alerts:",
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              SizedBox(height: 16),
+              _buildStep("1", "Go to Android Settings"),
+              _buildStep("2", "Tap on Notifications"),
+              _buildStep("3", "Enable 'Floating Notifications'"),
+              _buildStep("4", "Under Notifications Categories, find 'Hunter System Alert'"),
+              _buildStep("5", "Again turn on the Floating Notifications there"),
+              SizedBox(height: 16),
+              Text(
+                "This gives you WhatsApp-style popups for level ups!",
+                style: TextStyle(color: Colors.white60, fontSize: 14),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -54,7 +65,7 @@ class FloatingNotificationGuide extends StatelessWidget {
       ],
     );
   }
-  
+
   Widget _buildStep(String number, String text) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 2),
