@@ -21,7 +21,6 @@ import 'services/task_database.dart';
 import 'models/task_model.dart';
 import 'services/notification_service.dart';
 
-
 Future<void> main() async { 
   debugRepaintRainbowEnabled = true;
   WidgetsFlutterBinding.ensureInitialized();
@@ -1049,6 +1048,24 @@ class RealHome extends StatelessWidget {
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [Text('Run app Notification Test =>', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
+                  FloatingActionButton.large(
+                onPressed: () async {
+                  //await NotificationService().showSingleLevelUp(0, 1);
+                  // Checking if we should show the floating notification guide
+                  await NotificationService().intelligentFloatingDetection(context);
+                },
+                heroTag: "Notification Setup",
+                child: const Icon(Icons.notifications_active, color: Colors.white),
+              ),
+                ],
+              ),
+            )
+
           ],
         ),
       ),

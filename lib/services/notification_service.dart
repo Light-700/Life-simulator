@@ -1,8 +1,12 @@
 import 'dart:ui';
-
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+//import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import '/widgets/floating_notification_guide.dart';
+
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -28,7 +32,11 @@ class NotificationService {
       iOS: iosSettings,
     );
     
-    await _notifications.initialize(settings);
+    await _notifications.initialize(settings,
+     onDidReceiveNotificationResponse: onNotificationResponse
+     //onDidReceiveBackgroundNotificationResponse: onNotificationResponse,
+     );
+    await _createNotificationChannels();
     
     // Request permissions for Android 13+
     if (Platform.isAndroid) {
@@ -43,6 +51,79 @@ class NotificationService {
       print('Notification permission denied');
     }
   }
+
+  static bool _waitingForUserResponse = false;
+  static Timer? _responseTimer;
+
+  Future<void> intelligentFloatingDetection(BuildContext context) async {
+    await _notifications.show(
+      999,
+      "🎯 Hunter System Test",
+      "Tap this notification to confirm heads-up display works!",
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'hunter_system',
+          'Hunter System Alerts',
+          importance: Importance.max,
+          priority: Priority.high,
+          // Add action button for detection
+          actions: [
+            AndroidNotificationAction(
+              'confirm_floating',
+              'Heads-up works!',
+              showsUserInterface: true,
+            ), 
+          ],
+        ),
+      ),
+      payload: 'floating_test',
+    );
+
+    // Start detection timer
+    _waitingForUserResponse = true;
+    _responseTimer = Timer(Duration(seconds: 10), () {
+      if (_waitingForUserResponse && context.mounted) {
+        // User didn't interact - likely no heads-up display
+        showDialog(
+          context: context,
+          builder: (context) => FloatingNotificationGuide(),
+        );
+      }
+      _waitingForUserResponse = false;
+    });
+  }
+
+// @pragma('vm:entry-point') => tells the compiler to not consider it as dead code (not required here though)
+  void onNotificationResponse(NotificationResponse response) {
+    if (response.payload == 'floating_test') {
+      _waitingForUserResponse = false;
+      _responseTimer?.cancel();
+      // User saw and tapped - heads-up is working!
+    }
+  }
+
+
+Future<void> _createNotificationChannels() async {
+  if (Platform.isAndroid) {
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        _notifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    // Create high-priority channel for Hunter system alerts
+    await androidImplementation?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'hunter_system', // channel id
+        'Hunter System Alerts', // channel name  
+        description: 'Critical notifications for Hunter progression',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      ),
+    );
+  }
+}
+
 
   // BATCH COMPLETION NOTIFICATION - Multiple tasks completed simultaneously
   Future<void> showBatchCompletionNotification(
@@ -65,9 +146,9 @@ class NotificationService {
       'Tasks: $taskList\n💪 Total XP Gained: $totalXP\n📊 $breakdown',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'quest_completion',
-          'Quest Completion',
-          channelDescription: 'Notifications for completed quests and tasks',
+          'hunter_system', 
+          'Hunter System Alerts',
+      channelDescription: 'Critical notifications for Hunter progression',
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
@@ -93,9 +174,9 @@ class NotificationService {
       'Congratulations! You have advanced from Level $oldLevel to Level $newLevel!\n🎯 Keep pushing your limits, Hunter!',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'level_up',
-          'Level Up',
-          channelDescription: 'Notifications for level advancement',
+          'hunter_system', 
+          'Hunter System Alerts',
+      channelDescription: 'Critical notifications for Hunter progression',
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
@@ -121,9 +202,9 @@ class NotificationService {
       'INCREDIBLE! You have experienced a massive awakening!\n📈 Level $startLevel → $endLevel (+$levelGains levels)\n⚡ Your power has dramatically increased!',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'power_spike',
-          'Power Spike',
-          channelDescription: 'Notifications for massive level gains',
+          'hunter_system', 
+          'Hunter System Alerts',
+      channelDescription: 'Critical notifications for Hunter progression',
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
@@ -151,9 +232,9 @@ class NotificationService {
       'Congratulations! You have been promoted!\n🏆 $oldRank → $newRank\n$message',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'rank_advancement',
-          'Rank Advancement',
-          channelDescription: 'Notifications for hunter rank promotions',
+          'hunter_system', 
+          'Hunter System Alerts',
+      channelDescription: 'Critical notifications for Hunter progression',
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
@@ -184,9 +265,9 @@ class NotificationService {
       'Your training has paid off!\n💪 Total Points Gained: $totalPoints\n📈 Distribution: $statBreakdown',
       NotificationDetails(
         android: AndroidNotificationDetails(
-          'stat_allocation',
-          'Stat Allocation',
-          channelDescription: 'Notifications for stat point distribution',
+          'hunter_system', 
+          'Hunter System Alerts',
+      channelDescription: 'Critical notifications for Hunter progression',
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
@@ -215,7 +296,7 @@ class NotificationService {
       'E-class': '📝 Beginner Player! Your journey starts here!',
     };
     
-    return rankMessages[newRank] ?? 'Your Hunter ranking has improved!';
+    return rankMessages[newRank] ?? 'Your player ranking has improved!';
   }
 
   // Clear all notifications
