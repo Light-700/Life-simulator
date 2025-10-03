@@ -438,6 +438,90 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
           ),
         ),
+
+        Card(
+          shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(
+          color: Color.fromARGB(255, 193, 3, 3),
+          width: 2,
+        ),
+          ),
+          color: const Color.fromARGB(255, 0, 0, 0),
+          child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child:  OutlinedButton(
+                              onPressed: () async {
+                                //confirmation dialog
+                                bool? shouldDelete = await showDialog<bool>(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      backgroundColor: const Color.fromARGB(255, 37, 29, 29),
+                                      title: const Text(
+                                        'Deletion Confirmation',
+                                        style: TextStyle(
+                                          color: Color.fromARGB(255, 193, 3, 3),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      content: const Text(
+                                        'Are you sure you want to delete account?',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(false),
+                                          child: const Text(
+                                            'Cancel',
+                                            style: TextStyle(color: Color.fromARGB(255, 18, 187, 238)),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(true),
+                                          child: const Text(
+                                            'Delete',
+                                            style: TextStyle(color: Color.fromARGB(255, 193, 3, 3)),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                            
+                                if (shouldDelete == true && context.mounted) {
+                                  final navigator = Navigator.of(context);
+                            
+                                  await profileNotifier.deleteAccount();
+                            
+                                  navigator.pushAndRemoveUntil(
+                                    MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                    (route) => false,
+                                  );
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color.fromARGB(255, 193, 3, 3),
+                                side: const BorderSide(color: Color.fromARGB(255, 193, 3, 3)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center, 
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.logout, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delete Account',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+        ),
+        ),
                       ],
                     ),
                   ),

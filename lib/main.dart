@@ -116,49 +116,150 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();// password confirmation
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _loginFormKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _loginUsernameController = TextEditingController();
+  final TextEditingController _loginPasswordController = TextEditingController();
   bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
+  bool _loginPasswordVisible = false;
+  bool _isLoginMode = false; // bool for Toggling between login and sign-in
+
+  Future<void> handleReLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Checking if user data exists (returning user)
+    final existingUsername = prefs.getString('username');
+    final profileCompleted = prefs.getBool('profileCompleted') ?? false;
+    
+    if (existingUsername != null && profileCompleted) {
+      await prefs.setBool('isLoggedIn', true);
+      
+      final profileNotifier = Provider.of<ProfileNotifier>(context, listen: false);
+      await profileNotifier._loadUserData(); 
+      
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) =>  MyHomePage()),
+        );
+      }
+    } else {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ExtendedDetailsPage()),
+        );
+      }
+    }
+  }
+
+  Future<void> handleLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existingUsername = prefs.getString('username');
+    final existingPassword = prefs.getString('password');
+    
+    if (existingUsername == _loginUsernameController.text && 
+        existingPassword == _loginPasswordController.text) {
+      await handleReLogin();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid username or password'),
+            backgroundColor: Color.fromARGB(255, 238, 33, 18),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       appBar: AppBar(
-        title: const Text('Login'),
+        title: Text(_isLoginMode ? 'Player Login' : 'Player Registration'),
         backgroundColor: const Color.fromARGB(255, 228, 190, 21),
         centerTitle: true,
       ),
       backgroundColor: const Color.fromARGB(255, 0, 0, 0),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: Form(key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: 'Username',labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+        child: _isLoginMode ? _buildLoginForm() : _buildSignInForm(),
+      ),
+    );
+  }
+
+  Widget _buildSignInForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          const Text(
+            'Join the Association',
+            style: TextStyle(
+              color: Color.fromARGB(255, 238, 33, 18),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 30),
+          TextFormField(
+            controller: _usernameController,
+            decoration: const InputDecoration(
+              labelText: 'Player Name',
+              labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
               prefixIcon: Icon(Icons.person, color: Color.fromARGB(255, 238, 33, 18)),
               border: OutlineInputBorder(),
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18),),),),
-                style: const TextStyle(color: Colors.white),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your username';
-                  }
-                  if (value.length < 5) {
-                    return 'Username must be at least 5 characters long';
-                  }
-                  return null;
-                },
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
               ),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: !_passwordVisible,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                    labelStyle: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+            ),
+            style: const TextStyle(color: Colors.white),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your name';
+              }
+              if (value.length < 5) {
+                return 'Name must be at least 5 characters long';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _emailController,
+            decoration: const InputDecoration(
+              labelText: 'Email',
+              labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: Icon(Icons.email, color: Color.fromARGB(255, 238, 33, 18)),
+              border: OutlineInputBorder(),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+            ),
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.emailAddress,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your email';
+              }
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                return 'Please enter a valid email';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: !_passwordVisible,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              labelStyle: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
               prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255, 238, 33, 18)),
               border: const OutlineInputBorder(),
               enabledBorder: const OutlineInputBorder(
@@ -177,70 +278,210 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             style: const TextStyle(color: Colors.white),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
-                  }
-                  if (value.length < 8) {
-                    return 'Password must be at least 8 characters long';
-                  }
-                  return null;
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              if (value.length < 8) {
+                return 'Password must be at least 8 characters long';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _confirmPasswordController,
+            obscureText: !_confirmPasswordVisible,
+            decoration: InputDecoration(
+              labelText: 'Confirm Password',
+              labelStyle: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: const Icon(Icons.lock_outline, color: Color.fromARGB(255, 238, 33, 18)),
+              border: const OutlineInputBorder(),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _confirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: const Color.fromARGB(255, 238, 33, 18),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _confirmPasswordVisible = !_confirmPasswordVisible;
+                  });
                 },
               ),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email',labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
-              prefixIcon: Icon(Icons.email, color: Color.fromARGB(255, 238, 33, 18)),
+            ),
+            style: const TextStyle(color: Colors.white),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please confirm your password';
+              }
+              if (value != _passwordController.text) {
+                return 'Passwords do not match';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton(
+            onPressed: () async {
+              if (_formKey.currentState!.validate()) {
+                final profileNotifier = Provider.of<ProfileNotifier>(context, listen: false);
+                profileNotifier.updateName(_usernameController.text);
+
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('isLoggedIn', true);
+                await prefs.setString('username', _usernameController.text);
+                await prefs.setString('email', _emailController.text);
+                await prefs.setString('password', _passwordController.text);
+
+                if (mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ExtendedDetailsPage()),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 238, 33, 18),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 40),
+            ),
+            child: const Text(
+              'Start Your Journey',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _isLoginMode = true;
+              });
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color.fromARGB(255, 238, 33, 18),
+              side: const BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 40),
+            ),
+            child: const Text(
+              'Old User?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginForm() {
+    return Form(
+      key: _loginFormKey,
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          const Text(
+            'Welcome Back, Player',
+            style: TextStyle(
+              color: Color.fromARGB(255, 238, 33, 18),
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 30),
+          TextFormField(
+            controller: _loginUsernameController,
+            decoration: const InputDecoration(
+              labelText: 'Player Name',
+              labelStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: Icon(Icons.person, color: Color.fromARGB(255, 238, 33, 18)),
               border: OutlineInputBorder(),
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
               ),
             ),
             style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                   return 'Please enter a valid email';
-                 }
-                  return null;
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your name';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _loginPasswordController,
+            obscureText: !_loginPasswordVisible,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              labelStyle: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+              prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255, 238, 33, 18)),
+              border: const OutlineInputBorder(),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _loginPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: const Color.fromARGB(255, 238, 33, 18),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _loginPasswordVisible = !_loginPasswordVisible;
+                  });
                 },
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async{
-                  if (_formKey.currentState!.validate()) {
-                    // Get the ProfileNotifier instance and update username
-                    final profileNotifier = Provider.of<ProfileNotifier>(context, listen: false);
-                    profileNotifier.updateName(_usernameController.text);
-
-                    final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('username', _usernameController.text);
-                    await prefs.setString('email', _emailController.text);
-                    await prefs.setString('password', _passwordController.text);
-                   if (context.mounted) {
-        Navigator.pushReplacement(
-          context, 
-          MaterialPageRoute(builder: (context) => ExtendedDetailsPage())
-        );
-      } 
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 238, 33, 18),
-                foregroundColor: Colors.white,
-              ),
-                child: const Text('Sign in'),
-              ),
-            ],
-          ),),
+            ),
+            style: const TextStyle(color: Colors.white),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton(
+            onPressed: () async {
+              if (_loginFormKey.currentState!.validate()) {
+                await handleLogin();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 238, 33, 18),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 40),
+            ),
+            child: const Text(
+              'Enter the System',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 20),
+          OutlinedButton(
+            onPressed: () {
+              setState(() {
+                _isLoginMode = false;
+              });
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color.fromARGB(255, 238, 33, 18),
+              side: const BorderSide(color: Color.fromARGB(255, 238, 33, 18)),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 40),
+            ),
+            child: const Text(
+              'New player?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
 
 class ProfileNotifier extends ChangeNotifier {
   static const String usernameKey = 'username';
@@ -830,7 +1071,7 @@ static Map<String, int> _distributePointsByTaskShare({
     super.dispose();
   }
 
-  Future<void> logout() async {
+  Future<void> deleteAccount() async {
     final prefs = await SharedPreferences.getInstance();
     _xpProcessingTimer?.cancel();
     _computationIsolate?.kill(priority: Isolate.immediate);
@@ -850,6 +1091,23 @@ static Map<String, int> _distributePointsByTaskShare({
     
     notifyListeners();
   }
+
+  Future<void> logout() async {
+ final prefs = await SharedPreferences.getInstance();
+    _xpProcessingTimer?.cancel();
+    _computationIsolate?.kill(priority: Isolate.immediate);
+    _isolateReceivePort?.close();
+  
+  await prefs.remove('isLoggedIn');
+  
+   _pendingXPRewards.clear();
+    _isProcessingXP = false;
+    _cachedStats = null;
+    _lastStatsCacheTime = null;
+    
+    notifyListeners();
+}
+
 }
 
 class StatNotifier extends ChangeNotifier {
@@ -877,7 +1135,7 @@ class StatNotifier extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       initialize();
     });
-  }*/
+  }*/ 
   
   Future<void> _calculateStatHistory() async {
     final now = DateTime.now();
