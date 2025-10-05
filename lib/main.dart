@@ -1314,7 +1314,7 @@ class RealHome extends StatelessWidget {
             SizedBox(
               height: MediaQuery.of(context).size.height * 0.7,
               child: HexagonLayout(
-                buttonLabels: const ['PROFILE', 'STATS', 'TASKS', 'ACHIEVEMENTS'],
+                buttonLabels: const ['pROFILE', 'sTATS', 'qUESTS', 'aCHIEVEMENTS'],
                 buttonActions: [
                   () => navigator(1),
                   () => navigator(2),
