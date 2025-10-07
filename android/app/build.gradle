@@ -25,11 +25,10 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.example.life_simulator"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        // CRITICAL: Enable core library desugaring for notifications
         coreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -41,8 +40,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.life_simulator"
-        minSdk = 21
-        targetSdk = 35
+        minSdkVersion = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
         multiDexEnabled = true
@@ -61,7 +60,7 @@ flutter {
 
 dependencies {
     // Core library desugaring dependency for notifications
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     
     // Multidex support
     implementation 'androidx.multidex:multidex:2.0.1'

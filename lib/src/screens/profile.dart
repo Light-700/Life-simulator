@@ -218,23 +218,31 @@ class _ProfilePageState extends State<ProfilePage> {
                                           children: [
                                             Expanded(
                                               child: RepaintBoundary(
-                                                child: LinearProgressIndicator(
-                                                  value: Provider.of<ProfileNotifier>(context).getXPProgress(),
-                                                  minHeight: 18,
-                                                  borderRadius: BorderRadius.circular(10),
-                                                  color: const Color.fromARGB(255, 238, 179, 18),
-                                                  backgroundColor: const Color.fromARGB(131, 109, 29, 29),
-                                                ),
-                                              ),
-                                            ),
+                                                child: Consumer<ProfileNotifier>(  // ✅ Wrap with Consumer
+          builder: (context, profileNotifier, child) {
+            return LinearProgressIndicator(
+              value: profileNotifier.getXPProgress(),
+              minHeight: 18,
+              borderRadius: BorderRadius.circular(10),
+              color: const Color.fromARGB(255, 238, 33, 18),
+              backgroundColor: const Color.fromARGB(131, 109, 29, 29),
+            );
+          },
+        ),
+      ),
+    ),
                                             const SizedBox(width: 12),
-                                            Text(
-                                              "${profileNotifier.xp}/${profileNotifier.totalExp} XP",
-                                              style: TextStyle(
-                                                color: Color.fromARGB(255, 255, 254, 254),
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                              ),
+                                            Consumer<ProfileNotifier>(
+                                            builder: (context, profileNotifier, child) {
+                                                return Text(
+                                                  "${profileNotifier.xp}/${profileNotifier.totalExp} XP",
+                                                  style: TextStyle(
+                                                    color: Color.fromARGB(255, 255, 254, 254),
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                );
+                                              }
                                             ),
                                           ],
                                         ),

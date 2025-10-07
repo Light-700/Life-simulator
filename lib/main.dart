@@ -20,16 +20,27 @@ import 'src/screens/extended_login.dart';
 import 'services/task_database.dart';
 import 'models/task_model.dart';
 import 'services/notification_service.dart';
+import 'services/quest_database_hive.dart';
+import 'services/dynamic_quest_manager.dart';
+import 'services/daily_quest_manager.dart';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart'; 
 
 Future<void> main() async { 
   debugRepaintRainbowEnabled = true;
   WidgetsFlutterBinding.ensureInitialized();
 
   await TaskDatabase.initialize();
-  await ProgressionAnalyticsHive.init();
+  await ProgressionAnalyticsHive.init(); 
+  await QuestDatabaseHive.initialize();  
   await NotificationService().initialize();
   
-  // Check if user is logged in and profile is completed
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    print('⚠️ .env file not found, using fallback configuration');
+  }
+
   final prefs = await SharedPreferences.getInstance();
   final bool isLoggedIn = await determineLoginStatus();
   final bool profileCompleted = prefs.getBool('profileCompleted') ?? false;
@@ -62,6 +73,21 @@ Future<void> main() async {
           ),
     ),
   );
+ _initializeQuestSystemInBackground();
+}
+
+void _initializeQuestSystemInBackground() {
+  // Run after a delay to let the app fully render first
+  Future.delayed(Duration(seconds: 2), () async {
+    try {
+      print('🎯 Starting background quest system initialization...');
+      await DailyQuestManager.instance.initialize();
+      await DynamicQuestManager.instance.initialize();
+      print('✅ Quest system initialized successfully');
+    } catch (e) {
+      print('❌ Error initializing quest system: $e');
+    }
+  });
 }
 
 
@@ -1200,10 +1226,15 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
 var index=0;
 void navigator(int val){
+   if (val == 3 && !_questSystemReady) {
+      _ensureQuestSystemInitialized();
+    }
   setState(() {
     index=val;
   });
 }
+
+bool _questSystemReady = false;
 
   final GlobalKey _pageKey = GlobalKey();
   double _pageHeight = 0;
@@ -1214,7 +1245,31 @@ void navigator(int val){
     // Measure the size after the first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateHeight();
+      _ensureQuestSystemInitialized();
     });
+  }
+
+   Future<void> _ensureQuestSystemInitialized() async {
+    if (_questSystemReady) return;
+    
+    try {
+      // Check if quest managers are already initialized
+      final dailyReady = DailyQuestManager.instance.isInitialized;
+      final dynamicReady = DynamicQuestManager.instance.isInitialized;
+      
+      if (!dailyReady || !dynamicReady) {
+        print('🔄 Quest system not ready, initializing now...');
+        await Future.wait([
+          if (!dailyReady) DailyQuestManager.instance.initialize(),
+          if (!dynamicReady) DynamicQuestManager.instance.initialize(),
+        ]);
+      }
+      
+      setState(() => _questSystemReady = true);
+      print('✅ Quest system ready for use');
+    } catch (e) {
+      print('⚠️ Quest system initialization deferred: $e');
+    }
   }
 
   void _updateHeight() {
@@ -1302,13 +1357,17 @@ class RealHome extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 70, bottom: 15, left: 10, right:10),
               child: RepaintBoundary(
-                child: LinearProgressIndicator(  
-                  value: Provider.of<ProfileNotifier>(context).getXPProgress(),
-                  minHeight: 15,
-                  borderRadius: BorderRadius.circular(10),
-                  color: const Color.fromARGB(255, 238, 33, 18),
-                  backgroundColor: const Color.fromARGB(131, 54, 14, 14),
-                ),
+                child: Consumer<ProfileNotifier>(
+          builder: (context, profileNotifier, child) {
+            return LinearProgressIndicator(
+              value: profileNotifier.getXPProgress(),
+              minHeight: 18,
+              borderRadius: BorderRadius.circular(10),
+              color: const Color.fromARGB(255, 238, 33, 18),
+              backgroundColor: const Color.fromARGB(131, 109, 29, 29),
+            );
+          },
+        ),
               ),
             ),
             SizedBox(

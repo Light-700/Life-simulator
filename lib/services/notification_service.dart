@@ -308,4 +308,61 @@ Future<void> _createNotificationChannels() async {
   Future<void> clearNotification(int id) async {
     await _notifications.cancel(id);
   }
+
+  // Add to your existing NotificationService class
+Future<void> showNewQuestsAvailable(int count) async {
+  await _notifications.show(
+    2004,
+    '🎯 New Quests Available!',
+    'The System has generated $count new quests for your progression!',
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        'hunter_system',
+        'Hunter System Alerts',
+        importance: Importance.high,
+        priority: Priority.high,
+        color: const Color.fromARGB(255, 238, 33, 18),
+      ),
+    ),
+  );
+}
+
+Future<void> showDailyQuestWarning(int incompleteCount) async {
+  await _notifications.show(
+    2002,
+    '⚠️ Daily Quest Warning!',
+    'You have $incompleteCount incomplete daily quests. Complete them before midnight to avoid stat penalties!',
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        'hunter_system',
+        'Hunter System Alerts',
+        importance: Importance.max,
+        priority: Priority.high,
+        color: const Color.fromARGB(255, 255, 152, 0),
+        playSound: true,
+        enableVibration: true,
+      ),
+    ),
+  );
+}
+
+Future<void> showPenaltyNotification(String questTitle, int amount, String penaltyType) async {
+  await _notifications.show(
+    2003,
+    '💀 PENALTY APPLIED!',
+    'Failed to complete "$questTitle"\n-$amount ${penaltyType.replaceAll('_', ' ')} stats!\nThe System demands discipline!',
+    NotificationDetails(
+      android: AndroidNotificationDetails(
+        'hunter_system',
+        'Hunter System Alerts',
+        importance: Importance.max,
+        priority: Priority.max,
+        color: const Color.fromARGB(255, 211, 47, 47),
+        playSound: true,
+        enableVibration: true,
+      ),
+    ),
+  );
+}
+
 }

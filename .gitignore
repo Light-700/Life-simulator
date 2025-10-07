@@ -45,3 +45,6 @@ app.*.map.json
 /windows/flutter/generated_plugin_registrant.cc
 /macos/Flutter/GeneratedPluginRegistrant.swift
 
+.env
+*.env
+**/*.env
