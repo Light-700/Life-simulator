@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
 
     <application
-        android:label="life_simulator"
+        android:label="the_awakening"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

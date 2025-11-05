@@ -1,4 +1,4 @@
-package com.example.life_simulator
+package com.your.domain.huntersystem
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -24,6 +24,7 @@ dependencies:
   intl: ^0.20.2
   google_generative_ai: ^0.4.3
   flutter_dotenv: ^6.0.0
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -32,6 +33,7 @@ dev_dependencies:
   build_runner: ^2.4.7
 
   flutter_lints: ^6.0.0
+  change_app_package_name: ^1.5.0
 
 flutter:
   uses-material-design: true
@@ -48,6 +50,15 @@ flutter:
         - asset: assets/ArsenalSC/ArsenalSC-Italic.ttf
           style: italic
         - asset: assets/ArsenalSC/ArsenalSC-Regular.ttf
+
+flutter_native_splash:
+  color: "#0B0F1A"     
+  image: assets/splash.png
+  fullscreen: true
+  android_12:
+    color: "#0B0F1A"
+    image: assets/splash_android12.png
+    icon_background_color: "#111111"
    
 
 

@@ -19,8 +19,8 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  @override
 
+  @override
   Widget build(BuildContext context) { 
  //   final profileNotifier = Provider.of<ProfileNotifier>(context);
   
@@ -384,15 +384,40 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                  children: [
-                                    _buildStat("Tasks", "0"),
-                                    _buildStat("Points", "0"),
-                                    _buildStat("Streak", "0"),
-                                    /* need to implement the above three lines properly */
-                                  ],
-                                ),
+                               Consumer<ProfileNotifier>(
+  builder: (context, p, _) {
+    return FutureBuilder<int>(
+      future: p.getCompletedQuestCount(),
+      builder: (context, tasksSnap) {
+        final tasksCount = tasksSnap.data ?? p.completedTasks;
+
+        return FutureBuilder<int>(
+          future: p.getTotalXPEarned(),
+          builder: (context, pointsSnap) {
+            final points = pointsSnap.data ?? 0;
+
+            return FutureBuilder<int>(
+              future: p.getCurrentDailyStreak(windowDays: 30),
+              builder: (context, streakSnap) {
+                final streak = streakSnap.data ?? 0;
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStat("Tasks", "$tasksCount"),
+                    _buildStat("Total EXP", "$points"),
+                    _buildStat("Streak days", "$streak"),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  },
+)
+
                               ],
                             ),
                           ),

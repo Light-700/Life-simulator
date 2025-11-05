@@ -953,6 +953,59 @@ Future<int> _applyStatBonuses(Map<String, int> bonuses) async {
     notifyListeners();
   }
 
+  Future<int> getCompletedQuestCount() async {
+  try {
+    return TaskDatabase.getAllTasks().length; // total completed quests
+  } catch (_) {
+    return 0;
+  }
+}
+
+Future<int> getCompletedInPeriod({
+  required DateTime from,
+  required DateTime to,
+}) async {
+  final all = TaskDatabase.getAllTasks();
+  return all.where((t) {
+    final d = t.completedAt;
+    return !d.isBefore(from) && !d.isAfter(to);
+  }).length;
+}
+
+Future<int> getQuestsCompletedIn(Duration period) async {
+  final now = DateTime.now();
+  return getCompletedInPeriod(
+    from: DateTime(now.year, now.month, now.day).subtract(period),
+    to: now,
+  );
+}
+
+Future<int> getCurrentDailyStreak({int windowDays = 30}) async {
+  final now = DateTime.now();
+  final startWindow = DateTime(now.year, now.month, now.day)
+      .subtract(Duration(days: windowDays - 1));
+  final all = TaskDatabase.getAllTasks()
+      .where((t) => !t.completedAt.isBefore(startWindow))
+      .toList();
+  String dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+  final daysWithCompletions = all.map((t) {
+    final d = t.completedAt;
+    return dayKey(DateTime(d.year, d.month, d.day));
+  }).toSet();
+
+  int streak = 0;
+  for (int i = 0; i < windowDays; i++) {
+    final d = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: i));
+    if (daysWithCompletions.contains(dayKey(d))) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     _xpProcessingTimer?.cancel();
