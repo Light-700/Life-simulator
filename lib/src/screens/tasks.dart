@@ -1,10 +1,11 @@
-// lib/src/screens/tasks.dart - CORRECTED VERSION with BuildContext safety
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/quest_database_hive.dart';
 import '../../services/dynamic_quest_manager.dart';
 import '../../models/quest_model.dart';
 import '../../services/daily_quest_manager.dart';
+import 'package:provider/provider.dart';
+import '../../main.dart';
 
 class TaskPage extends StatefulWidget {
   final void Function(int) navigator;
@@ -48,7 +49,6 @@ class _TaskPageState extends State<TaskPage>
     setState(() => isLoading = true);
     
     try {
-      // Wait for quest system to be ready (with timeout)
       await Future.any([
         _waitForQuestSystem(),
         Future.delayed(Duration(seconds: 5)), // 5 second timeout
@@ -73,9 +73,8 @@ class _TaskPageState extends State<TaskPage>
     }
   }
   
-  // Load quests from database
   Future<void> _loadQuests() async {
-    if (!mounted) return; // SAFETY CHECK
+    if (!mounted) return; 
     setState(() => isLoading = true);
     
     try {
@@ -96,60 +95,178 @@ class _TaskPageState extends State<TaskPage>
     } catch (e) {
       print('❌ Error loading quests: $e');
     } finally {
-      if (mounted) { // SAFETY CHECK
+      if (mounted) { 
         setState(() => isLoading = false);
       }
     }
   }
   
-  // Complete a quest - CORRECTED with mounted checks
-  Future<void> _completeQuest(QuestModel quest) async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentLevel = prefs.getInt('level') ?? 1;
-    
-    try {
-      await QuestDatabaseHive.completeQuest(quest.id, currentLevel);
-      await DynamicQuestManager.instance.onQuestCompleted(quest.id);
-      
-      // FIXED: Check if widget is still mounted before using context
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Quest Completed: ${quest.title}'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      
-      // Reload quests
-      await _loadQuests();
-      
-    } catch (e) {
-      print('❌ Error completing quest: $e');
-      
-      // FIXED: Check if widget is still mounted before using context
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error completing quest'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+
+ Future _completeQuest(QuestModel quest) async {
+  print('\n🎯 ═══════════════════════════════════════════════');
+  print('   QUEST COMPLETION INITIATED');
+  print('   Quest ID: ${quest.id}');
+  print('   Quest Title: ${quest.title}');
+  print('   Quest Type: ${quest.questType}');
+  print('   Quest Difficulty: ${quest.difficulty}');
+  print('═══════════════════════════════════════════════\n');
+  
+  print('🔍 REWARD ANALYSIS:');
+  print('   quest.rewards type: ${quest.rewards.runtimeType}');
+  print('   quest.rewards content: ${quest.rewards}');
+  print('   quest.rewards.keys: ${quest.rewards.keys}');
+  print('   quest.rewards.values: ${quest.rewards.values}');
+  
+  // Checking for XP in different possible key names
+  final xpFromExp = quest.rewards['exp'];
+  final xpFromXp = quest.rewards['xp'];
+  final xpFromExperience = quest.rewards['experience'];
+  
+  print('   Checking XP keys:');
+  print('     quest.rewards["exp"]: $xpFromExp (type: ${xpFromExp.runtimeType})');
+  print('     quest.rewards["xp"]: $xpFromXp (type: ${xpFromXp.runtimeType})');
+  print('     quest.rewards["experience"]: $xpFromExperience');
+  
+
+  dynamic xpReward = xpFromExp ?? xpFromXp ?? xpFromExperience ?? 0;
+  print('   Raw xpReward: $xpReward (type: ${xpReward.runtimeType})');
+  
+  // integer conversion logic
+  int finalXpReward = 0;
+  if (xpReward is String) {
+    finalXpReward = int.tryParse(xpReward) ?? 0;
+    print('   Converted from String: $xpReward → $finalXpReward');
+  } else if (xpReward is int) {
+    finalXpReward = xpReward;
+    print('   Already int: $finalXpReward');
+  } else if (xpReward is double) {
+    finalXpReward = xpReward.round();
+    print('   Converted from double: $xpReward → $finalXpReward');
+  } else {
+    print('   ⚠️  Unrecognized type: ${xpReward.runtimeType}');
   }
   
-  // Force generate new quests - CORRECTED with mounted checks
+  print('   FINAL XP REWARD: $finalXpReward');
+  print('   Widget mounted: $mounted');
+  print('   Condition check: xpReward > 0 = ${finalXpReward > 0}, mounted = $mounted');
+  print('');
+  
+  final prefs = await SharedPreferences.getInstance();
+  final currentLevel = prefs.getInt('level') ?? 1;
+  
+  try {
+
+    print('   📝 Marking quest as complete in database...');
+    await QuestDatabaseHive.completeQuest(quest.id, currentLevel);
+
+    print('   🔄 Updating quest manager...');
+    await DynamicQuestManager.instance.onQuestCompleted(quest.id);
+    
+    print('   🎮 Attempting to award XP...');
+    if (finalXpReward > 0 && mounted) {
+      print('   ✅ Condition passed! Awarding XP...');
+
+      final taskType = _getTaskTypeFromQuestRewards(quest.rewards);
+      
+      print('   💰 Calling ProfileNotifier.updateXP()...');
+      print('      Amount: $finalXpReward');
+      print('      Task: ${quest.title}');
+      print('      Type: $taskType');
+      
+      final profileNotifier = Provider.of<ProfileNotifier>(context, listen: false);
+      await profileNotifier.updateXP(
+        finalXpReward,
+        taskName: quest.title,
+        taskType: taskType,
+      );
+      
+      print('   ✅ XP awarded successfully!');
+    } else {
+      print('   ❌ Condition FAILED:');
+      print('      finalXpReward > 0: ${finalXpReward > 0} (value: $finalXpReward)');
+      print('      mounted: $mounted');
+      if (finalXpReward <= 0) {
+        print('      → XP reward is zero or negative!');
+      }
+      if (!mounted) {
+        print('      → Widget is unmounted!');
+      }
+    }
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Quest completed: ${quest.title} (+$finalXpReward XP)'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+    
+    print('   🔄 Reloading quest list...');
+    await _loadQuests();
+    
+    print('\n✅ ═══════════════════════════════════════════════');
+    print('   QUEST COMPLETION SUCCESSFUL');
+    print('═══════════════════════════════════════════════\n');
+  } catch (e, stackTrace) {
+    print('\n❌ ═══════════════════════════════════════════════');
+    print('   QUEST COMPLETION FAILED');
+    print('   Error: $e');
+    print('   Stack: $stackTrace');
+    print('═══════════════════════════════════════════════\n');
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error completing quest: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+
+String _getTaskTypeFromQuestRewards(Map<String, dynamic> rewards) {
+  if (rewards.isEmpty) return 'intelligence';
+  
+  int maxReward = 0;
+  String primaryType = 'intelligence';
+  
+  rewards.forEach((stat, value) {
+    if (stat != 'xp' && stat != 'exp' && stat != 'experience') {
+      int rewardValue = 0;
+      
+      if (value is String) {
+        rewardValue = int.tryParse(value) ?? 0;
+      } else if (value is int) {
+        rewardValue = value;
+      } else if (value is double) {
+        rewardValue = value.round();
+      }
+      
+      if (rewardValue > maxReward) {
+        maxReward = rewardValue;
+        primaryType = stat;
+      }
+    }
+  });
+  
+  print('   🔍 Reward Analysis: $rewards → Primary Stat: $primaryType (${maxReward} points)');
+  return primaryType;
+}
+
+  
   Future<void> _generateNewQuests() async {
-    if (!mounted) return; // SAFETY CHECK
+    if (!mounted) return;
     setState(() => isLoading = true);
     
     try {
       await DynamicQuestManager.instance.forceGenerateQuests();
       await _loadQuests();
       
-      // FIXED: Check if widget is still mounted before using context
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -161,7 +278,7 @@ class _TaskPageState extends State<TaskPage>
     } catch (e) {
       print('❌ Error generating quests: $e');
     } finally {
-      if (mounted) { // SAFETY CHECK
+      if (mounted) {
         setState(() => isLoading = false);
       }
     }
@@ -190,7 +307,7 @@ if (isLoading && !questSystemReady) {
 
     return Column(
       children: [
-        // Existing Home Button - Preserved
+
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -205,7 +322,7 @@ if (isLoading && !questSystemReady) {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            // New Quest Generation Button
+
             IconButton(
               onPressed: _generateNewQuests,
               icon: Icon(
@@ -217,7 +334,7 @@ if (isLoading && !questSystemReady) {
           ],
         ),
         
-        // Quest Log Title
+
         Center(
           child: Text(
             "Quest Log",
@@ -311,7 +428,7 @@ if (isLoading && !questSystemReady) {
     );
   }
 
-  // Build ongoing quests with real data
+  // Build ongoing quests 
   Widget _buildOngoingContent() {
     if (ongoingQuests.isEmpty) {
       return Container(
@@ -365,7 +482,7 @@ if (isLoading && !questSystemReady) {
     );
   }
   
-  // Build completed quests with real data
+  // Build completed quests 
   Widget _buildCompletedContent() {
     if (completedQuests.isEmpty) {
       return Container(
@@ -420,7 +537,7 @@ if (isLoading && !questSystemReady) {
     );
   }
   
-  // Build upcoming quests with real data
+  // Build upcoming quests
   Widget _buildUpcomingContent() {
     if (upcomingQuests.isEmpty) {
       return Container(

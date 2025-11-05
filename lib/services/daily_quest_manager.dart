@@ -57,7 +57,7 @@ class DailyQuestManager {
         objectives: [
           'Complete ${baseReps.toInt()} push-ups (can be spread throughout day)',
           'Walk/Run ${baseDistance.toStringAsFixed(1)}km total distance',
-          'Hold plank for ${baseDuration} seconds',
+          'Hold plank for $baseDuration seconds',
         ],
         rewards: {
           'xp': 100 + (currentLevel * 10),
@@ -213,15 +213,12 @@ class DailyQuestManager {
     switch (penaltyType) {
       case 'all_stats':
         await _reduceAllStats(amount, prefs);
-        break;
       case 'physical_stats':
         await _reduceStat('strengthStat', amount, prefs);
         await _reduceStat('enduranceStat', amount, prefs);
         await _reduceStat('vitalityStat', amount, prefs);
-        break;
       case 'intelligence':
         await _reduceStat('intelligenceStat', amount, prefs);
-        break;
       default:
         await _reduceStat('${penaltyType}Stat', amount, prefs);
     }
@@ -243,7 +240,7 @@ class DailyQuestManager {
     final currentValue = prefs.getInt(statKey) ?? 30;
     final newValue = (currentValue - amount).clamp(1, 999); // Don't go below 1
     await prefs.setInt(statKey, newValue);
-    print('💀 Reduced $statKey by $amount (${currentValue} → ${newValue})');
+    print('💀 Reduced $statKey by $amount ($currentValue → $newValue)');
   }
   
   // Schedule daily reset at midnight

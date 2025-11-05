@@ -218,7 +218,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           children: [
                                             Expanded(
                                               child: RepaintBoundary(
-                                                child: Consumer<ProfileNotifier>(  // ✅ Wrap with Consumer
+                                                child: Consumer<ProfileNotifier>(  
           builder: (context, profileNotifier, child) {
             return LinearProgressIndicator(
               value: profileNotifier.getXPProgress(),
@@ -335,13 +335,17 @@ class _ProfilePageState extends State<ProfilePage> {
                             padding: EdgeInsets.all(16.0),
                             child: Column(
                               children: [
-                                Text(
-                                  "Level ${profileNotifier.level}",
-                                  style: TextStyle(
-                                    color: Color.fromARGB(255, 18, 187, 238),
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Consumer<ProfileNotifier>(
+  builder: (context, profileNotifier, child) {
+                                    return Text(
+                                      "Level ${profileNotifier.level}",
+                                      style: TextStyle(
+                                        color: Color.fromARGB(255, 18, 187, 238),
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  }
                                 ),
                                 SizedBox(height: 8),
                                 Text(

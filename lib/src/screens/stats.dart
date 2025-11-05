@@ -139,7 +139,7 @@ Widget _bottomTitleBuilder(double value, TitleMeta meta) {
                 Expanded(
                   child: RepaintBoundary(
                     child: LinearProgressIndicator(
-                      value: 0.01,
+                      value: profileNotifier.getXPProgress(),
                       minHeight: 18,
                       borderRadius: BorderRadius.circular(10),
                       color: const Color.fromARGB(255, 238, 179, 18),
@@ -149,7 +149,7 @@ Widget _bottomTitleBuilder(double value, TitleMeta meta) {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  "${profileNotifier.xp}/100 XP",
+                  "${profileNotifier.xp}/${profileNotifier.totalExp} XP",
                   style: const TextStyle(
                     color: Color.fromARGB(255, 255, 254, 254),
                     fontSize: 12,

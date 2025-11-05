@@ -242,29 +242,21 @@ class QuestModel extends HiveObject {
 @HiveType(typeId: 2)
 class DailyQuest extends QuestModel {
   DailyQuest({
-    required String id,
-    required String title,
-    required String description,
-    required Map<String, int> rewards,
-    required List<String> objectives,
-    bool isMandatory = true,
-    int penaltyAmount = 1,
-    String penaltyType = 'all_stats',
+    required super.id,
+    required super.title,
+    required super.description,
+    required super.rewards,
+    required super.objectives,
+    super.isMandatory = true,
+    super.penaltyAmount = 1,
+    super.penaltyType = 'all_stats',
     DateTime? lastResetDate,
   }) : super(
-          id: id,
-          title: title,
-          description: description,
           questType: 'daily',
-          difficulty: 'E', // Daily quests start easy but can scale
-          objectives: objectives,
-          rewards: rewards,
+          difficulty: 'E',
           category: 'mandatory',
           createdAt: DateTime.now(),
           expiresAt: _getNextMidnight(),
-          isMandatory: isMandatory,
-          penaltyAmount: penaltyAmount,
-          penaltyType: penaltyType,
         );
   
   static DateTime _getNextMidnight() {
