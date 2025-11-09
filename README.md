@@ -1,10 +1,10 @@
-# Life Simulator
+# The Awakening
 
 A Flutter app that translates your life into a game :)
 
 ## Description
 
-Life Simulator is an interactive application that gamifies your daily life experiences. Built with Flutter, this app transforms your everyday activities into an engaging game-like experience.
+"The Awakening" is an interactive application that gamifies your daily life experiences. Built with Flutter, this app transforms your everyday activities into an engaging game-like experience.
 
 ## Prerequisites
 
